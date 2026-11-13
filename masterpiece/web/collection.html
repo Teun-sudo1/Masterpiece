@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My collection · Masterpiece</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { padding-bottom: 40px; }
+    .top.coll { grid-template-columns: 1fr auto; }
+    .coll-head { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin: 0 0 18px; }
+    .coll-head h2 { margin: 0; font: 600 26px/1.2 var(--serif); }
+    .coll-head .sub { color: var(--muted); font-size: 14px; }
+    .now { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 22px; }
+    .now .pill { padding: 6px 12px; border-radius: 999px; font-size: 13px;
+      background: var(--panel); border: 1px solid var(--accent); }
+    .now .pill b { color: var(--accent); font-weight: 600; margin-right: 6px; }
+    .card .thumb { cursor: pointer; display: block; }
+    .card h3 a { color: inherit; text-decoration: none; }
+    .card h3 a:hover { text-decoration: underline; }
+    .now .pill { color: var(--text); text-decoration: none; }
+    .now .pill:hover { background: var(--panel-2); }
+    .card .fav { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; padding: 0;
+      display: grid; place-items: center; border-radius: 50%;
+      background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); color: #fff; }
+    .card .fav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+    .card .fav:hover { border-color: #fff; }
+    .card .fav.on { color: #ff6b81; border-color: #ff6b81; }
+    .card .fav.on svg { fill: currentColor; }
+    .card .onscreen { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; background: var(--accent); color: var(--accent-ink); }
+    .card .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .card .actions button { padding: 5px 10px; font-size: 12px; }
+    .card .actions .danger { border-color: color-mix(in srgb, var(--danger) 50%, var(--line)); }
+    .card .actions .danger:hover { border-color: var(--danger); }
+    .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+    details.hidden-list { margin-top: 34px; }
+    details.hidden-list summary { cursor: pointer; color: var(--muted); }
+    .hidden-list ul { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; }
+    .hidden-list li { display: flex; gap: 12px; align-items: center; justify-content: space-between;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+    .hidden-list li span { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header class="top coll">
+    <div class="brand">
+      <h1>Masterpiece</h1>
+      <p><a href="/">← Back to the paintings</a></p>
+    </div>
+    <button id="restoreBtn" class="restore" hidden title="Stop Masterpiece and put back the wallpaper you had before">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg>
+      Restore my wallpaper</button>
+  </header>
+
+  <main>
+    <div class="coll-head">
+      <h2>My collection</h2>
+      <span class="sub" id="sub"></span>
+    </div>
+    <div class="now" id="now"></div>
+    <div id="grid" class="grid"></div>
+    <p class="empty" id="empty" hidden>Your collection is empty. Select paintings and click
+      <b>Set as wallpaper</b> to add them.</p>
+
+    <details class="hidden-list" id="hiddenBox" hidden>
+      <summary id="hiddenSummary">Hidden paintings</summary>
+      <ul id="hiddenList"></ul>
+    </details>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, body) {
+      const opts = body === undefined ? {} : {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      };
+      const r = await fetch(path, opts);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      return data;
+    }
+    function el(tag, attrs = {}, ...children) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") n.className = v;
+        else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+        else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+      }
+      for (const c of children) n.append(c);
+      return n;
+    }
+    let toastTimer;
+    function toast(msg, ms = 5000) {
+      const t = $("toast");
+      t.textContent = msg; t.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => (t.hidden = true), ms);
+    }
+    const skippedMsg = (r) => {
+      const now = Object.values(r.wallpapers || {});
+      return `Skipped and removed.${now.length ? ` Now showing ${now.map((t) => `“${t}”`).join(" and ")}.` : ""}`;
+    };
+    const mb = (b) => `${(b / 1048576).toFixed(b > 10485760 ? 0 : 1)} MB`;
+
+    async function act(body, okMsg) {
+      try {
+        const r = await api("/api/collection", body);
+        if (okMsg) toast(typeof okMsg === "function" ? okMsg(r) : okMsg);
+        load();
+      } catch (e) { toast(`Didn't work: ${e.message}`); }
+    }
+
+    const infoUrl = (name) => `painting.html?name=${encodeURIComponent(name)}`;
+    const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>';
+
+    function heart(it) {
+      const b = el("button", { type: "button", class: `fav${it.favourite ? " on" : ""}`,
+        "aria-pressed": String(!!it.favourite),
+        title: it.favourite ? "Favourite: comes up more often. Click to undo." : "Favourite: show this one more often",
+        onclick: () => act({ action: "favourite", name: it.name, on: !it.favourite },
+          it.favourite ? "No longer a favourite." : "Favourite! It comes up about three times as often.") });
+      b.innerHTML = HEART;
+      return b;
+    }
+
+    function card(it) {
+      return el("article", { class: "card" },
+        el("a", { class: "thumb", href: infoUrl(it.name), title: "About this painting" },
+          el("img", { src: `/api/thumb?name=${encodeURIComponent(it.name)}`, alt: it.title, loading: "lazy" })),
+        ...(it.onScreen ? [el("span", { class: "onscreen" }, "On screen now")] : []),
+        heart(it),
+        el("div", { class: "body" },
+          el("h3", { title: it.title }, el("a", { href: infoUrl(it.name) }, it.title)),
+          el("div", { class: "maker" }, [it.maker, it.year].filter(Boolean).join(", ")),
+          el("div", { class: "meta" },
+            el("span", { class: "badge" }, it.museum || "—"),
+            el("span", {}, it.width ? `${it.width} × ${it.height}` : "")),
+          el("div", { class: "actions" },
+            el("button", { type: "button", class: "primary",
+              onclick: () => act({ action: "show", name: it.name },
+                (r) => `Now showing ${Object.values(r.wallpapers).map((t) => `“${t}”`).join(" and ")}.`) }, "Show now"),
+            ...(it.link ? [el("button", { type: "button", onclick: () => window.open(it.link, "_blank", "noopener") }, "Museum page")] : []),
+            it.onScreen
+              ? el("button", { type: "button", title: "Remove it from your collection and show another painting there",
+                  onclick: () => act({ action: "skip", name: it.name }, skippedMsg) }, "Skip")
+              : el("button", { type: "button", onclick: () => act({ action: "remove", name: it.name }, "Removed from your collection.") }, "Remove"),
+            el("button", { type: "button", class: "danger", title: "Remove it and never show it in the results again",
+              onclick: () => act({ action: "ban", name: it.name }, "Removed. It won't show up in the results again.") },
+              "Never show again"))));
+    }
+
+    async function load() {
+      const d = await api("/api/collection");
+      const total = d.items.reduce((s, i) => s + i.bytes, 0);
+      $("sub").textContent = d.items.length
+        ? `${d.items.length} painting${d.items.length === 1 ? "" : "s"} · ${mb(total)} · ${d.folder}` : "";
+      $("grid").replaceChildren(...d.items.map(card));
+      $("empty").hidden = d.items.length > 0;
+      $("now").replaceChildren(...d.current.map((c) =>
+        el("a", { class: "pill", href: infoUrl(c.name), title: "About this painting" },
+          el("b", {}, c.screen), `${c.title}${c.maker ? ` — ${c.maker}` : ""}`)));
+      const favs = d.items.filter((i) => i.favourite).length;
+      if (favs) $("sub").textContent += ` · ${favs} favourite${favs === 1 ? "" : "s"}`;
+      $("restoreBtn").hidden = !(d.backup || (d.rotation && d.rotation.active));
+      $("hiddenBox").hidden = !d.banned.length;
+      $("hiddenSummary").textContent = `Hidden paintings (${d.banned.length})`;
+      $("hiddenList").replaceChildren(...d.banned.map((b) =>
+        el("li", {}, el("div", {}, b.title, " ", el("span", {}, [b.maker, b.museum].filter(Boolean).join(" · "))),
+          el("button", { type: "button", onclick: () => act({ action: "unban", id: b.id }, "It can show up in the results again.") }, "Unhide"))));
+    }
+
+    $("restoreBtn").addEventListener("click", async () => {
+      try {
+        const r = await api("/api/rotation", { action: "restore" });
+        toast(r.restored === "previous" ? "Masterpiece stopped. Your previous wallpaper is back."
+          : r.restored === "default" ? "Masterpiece stopped. Windows' default wallpaper is back." : "Masterpiece stopped.");
+        load();
+      } catch (e) { toast(`Couldn't restore the wallpaper: ${e.message}`); }
+    });
+    load().catch((e) => toast(`Couldn't load your collection: ${e.message}`));
+  </script>
+</body>
+</html>

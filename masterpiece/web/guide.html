@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Masterpiece works</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { padding-bottom: 40px; }
+    .guide { max-width: 720px; margin: 0 auto; padding: 48px 24px 0; }
+    h1 { font: 600 40px/1.05 var(--serif); margin: 0 0 8px; }
+    .lede { color: var(--muted); font-size: 16px; margin: 0 0 28px; }
+    ol.steps { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 10px; counter-reset: s; }
+    ol.steps li { counter-increment: s; display: flex; gap: 14px; align-items: baseline; color: var(--muted); }
+    ol.steps li::before {
+      content: counter(s); flex: none; width: 26px; height: 26px; border-radius: 50%;
+      display: grid; place-items: center; font-weight: 700; font-size: 13px;
+      background: var(--accent); color: var(--accent-ink); transform: translateY(-2px);
+    }
+    b { color: var(--text); }
+    .modes { display: grid; gap: 6px; margin: 0 0 16px; padding: 14px 16px;
+             background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+    .modes div { color: var(--muted); font-size: 14px; }
+    .advice { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 28px;
+              background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid var(--accent); }
+    .foot { color: var(--muted); font-size: 13px; margin-top: 28px; }
+    @media (max-width: 600px) { h1 { font-size: 32px; } .guide { padding: 28px 16px 0; } }
+  </style>
+</head>
+<body>
+  <main class="guide">
+    <h1>Masterpiece</h1>
+    <p class="lede">Public-domain paintings from great museums, fitted to your screens.</p>
+
+    <ol class="steps">
+      <li><span><b>Browse.</b> Pick museums, a subject or period, or search for an artist.</span></li>
+      <li><span><b>Select.</b> Click <b>+</b> on the paintings you like. Click a picture to see it larger.</span></li>
+      <li><span><b>Set as wallpaper.</b> Choose how below, then click the button in the bottom right.</span></li>
+    </ol>
+
+    <div class="modes">
+      <div><b>Masterpiece rotation:</b> a new painting at the interval you choose, fitted to each screen.</div>
+      <div><b>Windows slideshow:</b> Windows shuffles them itself and crops them to fit.</div>
+      <div><b>Just once:</b> set it now and leave it.</div>
+    </div>
+    <div class="advice" id="advice" hidden></div>
+
+    <button class="primary" id="start">Start choosing paintings</button>
+
+    <p class="foot">Paintings are saved in <span id="folder">Pictures\Masterpiece</span>. Stop the rotation any time
+      with <b>stop</b> at the bottom of the app.<br>
+      An independent open-source project, not an official app of any museum.</p>
+  </main>
+
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+
+    $("start").addEventListener("click", async () => {
+      try {
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ introSeen: true }),
+        });
+      } finally {
+        location.href = "/";
+      }
+    });
+
+    (async () => {
+      try {
+        const [o, s] = await Promise.all([
+          fetch("/api/options").then((r) => r.json()),
+          fetch("/api/settings").then((r) => r.json()),
+        ]);
+        $("folder").textContent = s.folder || s.defaultFolder || "Pictures\\Masterpiece";
+        if (s.introSeen) $("start").textContent = "Back to the paintings";
+        const scr = o.screens || [];
+        if (scr.length > 1 || scr.some((m) => m.height > m.width)) {
+          const portrait = scr.some((m) => m.height > m.width);
+          $("advice").innerHTML = `<b>Tip for your ${scr.length} screens:</b> use <b>Masterpiece rotation</b>` +
+            (portrait ? ", so your portrait screen gets tall paintings." : ", so each screen gets its own painting.");
+          $("advice").hidden = false;
+        }
+      } catch { /* the guide works without this */ }
+    })();
+  </script>
+</body>
+</html>

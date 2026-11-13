@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Masterpiece</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Masterpiece</h1>
+      <p>Public-domain paintings as your Windows wallpaper · <a href="collection.html" id="collLink">My collection</a>
+        · <a href="guide.html">How it works</a>
+        · <button type="button" class="link ver" id="verBtn" title="Check for updates"></button></p>
+    </div>
+
+    <form id="search" class="search" autocomplete="off">
+      <input id="q" type="search" placeholder="Search paintings — e.g. sea, Monet, winter…" aria-label="Search">
+      <button type="submit">Search</button>
+    </form>
+
+    <div class="filters">
+      <details class="dropdown" id="sourcesDd">
+        <summary><span id="sourcesSummary">Museums</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <div class="menu">
+          <div class="menu-actions">
+            <button type="button" class="link" id="srcAll">All</button>
+            <button type="button" class="link" id="srcNone">None</button>
+          </div>
+          <div id="sources" role="group" aria-label="Museums"></div>
+        </div>
+      </details>
+      <div class="group">
+        <select id="region" hidden aria-hidden="true"><option value="">Everywhere</option></select>
+        <details class="dropdown" id="regionDd">
+          <summary title="Choose a region on the map">
+            <svg class="globe" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 2.6 4.2 5.6 4.2 9s-1.4 6.4-4.2 9c-2.8-2.6-4.2-5.6-4.2-9S9.2 5.6 12 3z"/>
+            </svg>
+            <span id="regionSummary">Everywhere</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+          <div class="menu map-menu">
+            <div class="map-wrap">
+              <svg id="worldMap" viewBox="0 0 1000 420" role="img" aria-label="World map of regions"></svg>
+              <div class="map-tip" id="mapTip" hidden></div>
+            </div>
+            <div class="region-list" id="regionList" role="group" aria-label="Regions"></div>
+          </div>
+        </details>
+        <label>Subject <select id="subject"><option value="">Anything</option></select></label>        <label>Period <select id="period"><option value="">Any time</option></select></label>
+        <label title="Only the Art Institute of Chicago supports colour search">Colour
+          <select id="color">
+            <option value="">Any</option>
+            <option value="red">Red</option>
+            <option value="orange">Orange</option>
+            <option value="yellow">Yellow</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="purple">Purple</option>
+          </select>
+        </label>
+        <span class="hide-group" id="hide" aria-label="Hide"><span class="lbl">Hide</span></span>
+      </div>
+    </div>
+    <div class="filters">
+      <div class="group">
+        <label>Shape
+          <select id="orientation">
+            <option value="screens">Fits my screens</option>
+            <option value="span" id="optSpan">Spans all my screens</option>
+            <option value="any">Any shape</option>
+            <option value="landscape">Landscape</option>
+            <option value="portrait">Portrait</option>
+            <option value="widescreen">≈ 16:9 widescreen</option>
+            <option value="panorama">Panorama (2:1 and wider)</option>
+          </select>
+        </label>
+        <label title="Width of the downloadable image in pixels">Resolution
+          <select id="minWidth">
+            <option value="sharp" id="optSharp">Sharp on my screens</option>
+            <option value="0">Any size</option>
+            <option value="1280">≥ 1280 px wide · HD (720p)</option>
+            <option value="1920">≥ 1920 px wide · Full HD (1080p)</option>
+            <option value="2560">≥ 2560 px wide · QHD (1440p)</option>
+            <option value="3840">≥ 3840 px wide · 4K UHD</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="topOnly"> Highlights only</label>
+      </div>
+      <p class="screens" id="screenInfo"></p>
+    </div>
+  </header>
+
+  <main>
+    <div id="updateBar" class="update-bar" role="status" hidden>
+      <span id="updateText"></span>
+      <span class="update-actions">
+        <button type="button" class="primary" id="updateInstall">Install now</button>
+        <button type="button" class="link" id="updateNotes">What's new</button>
+        <button type="button" class="link" id="updateLater">Later</button>
+      </span>
+      <div class="progress" id="updateBarProgress" hidden><span id="updateProgress"></span></div>
+    </div>
+    <div id="notice" class="notice" hidden></div>
+    <p id="regionNote" class="region-note" hidden></p>
+    <div id="grid" class="grid"></div>
+    <div class="more">
+      <p id="status"></p>
+      <button id="loadMore" hidden>Load more</button>
+    </div>
+  </main>
+
+  <footer class="tray" id="tray">
+    <div class="tray-info">
+      <strong id="selCount">0 selected</strong>
+      <button id="clearSel" class="link">clear</button>
+      <button id="showSel" class="link">show</button>
+      <span id="rotStatus" class="rot" hidden></span>
+      <button id="rotNext" class="link" hidden>next painting</button>
+      <button id="restoreBtn" class="restore" hidden title="Stop Masterpiece and put back the wallpaper you had before">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg>
+        Restore my wallpaper</button>
+    </div>
+    <div class="tray-opts">
+      <label title="See “How it works” for the differences">Show as
+        <select id="mode">
+          <option value="rotate">Masterpiece rotation</option>
+          <option value="slideshow">Windows slideshow</option>
+          <option value="once">Just once</option>
+        </select>
+      </label>
+      <label id="intervalWrap">Change
+        <select id="interval">
+          <option value="10">every 10 min</option>
+          <option value="30">every 30 min</option>
+          <option value="60">every hour</option>
+          <option value="180">every 3 hours</option>
+          <option value="1440">once a day</option>
+          <option value="custom">custom…</option>
+        </select>
+      </label>
+      <span id="customWrap" class="custom-interval" hidden>
+        <input id="customN" type="number" min="1" max="999" step="1" value="2" aria-label="Interval">
+        <select id="customUnit" aria-label="Unit">
+          <option value="1">minutes</option>
+          <option value="60">hours</option>
+          <option value="1440">days</option>
+        </select>
+      </span>
+      <label class="check" id="todWrap" title="Brighter paintings during the day, darker and calmer ones in the evening">
+        <input type="checkbox" id="timeOfDay"> Match time of day</label>
+      <label id="screensWrap" hidden>Screens
+        <select id="screens">
+          <option value="each">Matching painting per screen</option>
+          <option value="same">Same painting on all</option>
+          <option value="span">One painting across all</option>
+        </select>
+      </label>
+      <label>Keep max
+        <input id="maxFiles" type="number" min="1" max="1000" step="1">
+      </label>
+      <span class="label-opt">
+        <label class="check"><input type="checkbox" id="label"> Label</label>
+        <button type="button" class="link" id="labelPosBtn">style &amp; position…</button>
+      </span>
+    </div>
+    <button id="apply" class="primary" disabled>Set as wallpaper</button>
+  </footer>
+
+  <dialog id="lightbox">
+    <button class="icon-btn close" id="lbClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <button class="icon-btn nav prev" id="lbPrev" aria-label="Previous">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <figure>
+      <div class="stage">
+        <img id="lbImg" alt="">
+        <div class="progress" id="lbBar" aria-hidden="true"><span id="lbProgress"></span></div>
+      </div>
+      <figcaption>
+        <h2 id="lbTitle"></h2>
+        <p id="lbMeta"></p>
+        <p class="actions">
+          <button id="lbSelect" class="primary"></button>
+          <a id="lbLink" target="_blank" rel="noopener">View on museum site ↗</a>
+        </p>
+      </figcaption>
+    </figure>
+    <button class="icon-btn nav next" id="lbNext" aria-label="Next">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </dialog>
+
+  <dialog id="labelDlg" class="label-dlg">
+    <h2>Label style &amp; position</h2>
+    <p class="hint">Pick a look, then drag the label on any screen. The same style and spot are used on every screen.</p>
+    <div class="label-styles" id="labelStyles">
+      <div class="seg-group"><span class="lbl">Look</span>
+        <span class="seg" data-key="look">
+          <button type="button" data-v="dark">Dark</button>
+          <button type="button" data-v="light">Light</button>
+          <button type="button" data-v="plaque">Museum plaque</button>
+          <button type="button" data-v="shadow">Shadow</button>
+          <button type="button" data-v="subtle">Subtle</button>
+        </span>
+      </div>
+      <div class="seg-group"><span class="lbl">Text</span>
+        <span class="seg" data-key="text">
+          <button type="button" data-v="full">Title — Artist · Museum</button>
+          <button type="button" data-v="two">Two lines</button>
+          <button type="button" data-v="artist">Title — Artist</button>
+          <button type="button" data-v="title">Title only</button>
+        </span>
+      </div>
+      <div class="seg-group"><span class="lbl">Font</span>
+        <span class="seg" data-key="font">
+          <button type="button" data-v="sans">Sans</button>
+          <button type="button" data-v="serif" class="serif">Serif</button>
+        </span>
+        <span class="lbl">Size</span>
+        <span class="seg" data-key="size">
+          <button type="button" data-v="s">S</button>
+          <button type="button" data-v="m">M</button>
+          <button type="button" data-v="l">L</button>
+        </span>
+      </div>
+    </div>
+    <div class="screens-stage" id="labelStage"></div>
+    <div class="dlg-actions">
+      <span class="presets">
+        <button type="button" class="link" data-pos="0.5,0.93">bottom centre</button>
+        <button type="button" class="link" data-pos="0.5,0.5">centre</button>
+        <button type="button" class="link" data-pos="0.86,0.93">bottom right</button>
+        <button type="button" class="link" data-pos="0.5,0.07">top centre</button>
+      </span>
+      <button type="button" class="primary" id="labelDone">Done</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About this painting · Masterpiece</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { padding: 0 0 40px; }
+    .top.coll { grid-template-columns: 1fr; }
+    .info { max-width: 1080px; margin: 28px auto 0; padding: 0 24px;
+      display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+    @media (max-width: 820px) { .info { grid-template-columns: 1fr; } }
+    .info .pic { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      overflow: hidden; }
+    .info .pic img { display: block; width: 100%; height: auto; }
+    .info h2 { margin: 0 0 6px; font: 600 30px/1.2 var(--serif); }
+    .info .who { color: var(--muted); font-size: 16px; margin: 0 0 14px; }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+    .pills span { padding: 3px 10px; border-radius: 999px; font-size: 12px; background: var(--panel-2);
+      border: 1px solid var(--line); }
+    .pills .now { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+    a.button { display: inline-block; border-radius: var(--radius); padding: 9px 16px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--text); text-decoration: none; }
+    a.button:hover { border-color: var(--muted); }
+    .actions .fav.on { color: #ff6b81; border-color: #ff6b81; }
+    .desc { white-space: pre-line; line-height: 1.6; margin: 0 0 18px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 16px; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; }
+    .loading { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header class="top coll">
+    <div class="brand">
+      <h1>Masterpiece</h1>
+      <p><a href="/">Paintings</a> · <a href="collection.html">My collection</a></p>
+    </div>
+  </header>
+
+  <main class="info" id="info">
+    <p class="loading">Loading…</p>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const name = new URLSearchParams(location.search).get("name") || "";
+
+    async function api(path, body) {
+      const opts = body === undefined ? {} : {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      };
+      const r = await fetch(path, opts);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      return data;
+    }
+    function el(tag, attrs = {}, ...children) {
+      const n = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") n.className = v;
+        else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+        else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+      }
+      for (const c of children) n.append(c);
+      return n;
+    }
+    let toastTimer;
+    function toast(msg, ms = 5000) {
+      const t = $("toast");
+      t.textContent = msg; t.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => (t.hidden = true), ms);
+    }
+    const shownText = (r) => Object.values(r.wallpapers || {}).map((t) => `“${t}”`).join(" and ");
+
+    async function act(body, done) {
+      try {
+        const r = await api("/api/collection", body);
+        done(r);
+      } catch (e) { toast(`Didn't work: ${e.message}`); }
+    }
+
+    function render(p) {
+      document.title = `${p.title} · Masterpiece`;
+      const d = p.details || {};
+      const facts = [["Date", p.year], ["Museum", p.museum], ...(d.facts || []),
+                     ["Image", p.width ? `${p.width} × ${p.height} px` : ""], ["Licence", p.license]]
+        .filter(([, v]) => v);
+      $("info").replaceChildren(
+        el("div", { class: "pic" },
+          el("img", { src: `/api/thumb?name=${encodeURIComponent(p.name)}&size=large`, alt: p.title })),
+        el("div", {},
+          el("h2", {}, p.title),
+          el("p", { class: "who" }, [p.maker, p.year].filter(Boolean).join(", ")),
+          el("div", { class: "pills" },
+            ...p.screens.map((s) => el("span", { class: "now" }, `On screen now · ${s}`)),
+            ...(p.favourite ? [el("span", {}, "♥ Favourite")] : [])),
+          el("div", { class: "actions" },
+            el("button", { type: "button", class: "primary",
+              onclick: () => act({ action: "show", name: p.name }, (r) => { toast(`Now showing ${shownText(r)}.`); load(); }) },
+              "Show now"),
+            el("button", { type: "button", class: `fav${p.favourite ? " on" : ""}`,
+              onclick: () => act({ action: "favourite", name: p.name, on: !p.favourite }, () => {
+                toast(p.favourite ? "No longer a favourite." : "Favourite! It comes up about three times as often.");
+                load();
+              }) }, p.favourite ? "♥ Favourite" : "♡ Favourite"),
+            el("button", { type: "button", title: "Remove it from your collection and show another painting there",
+              onclick: () => act({ action: "skip", name: p.name }, (r) => {
+                const now = shownText(r);
+                toast(`Skipped and removed.${now ? ` Now showing ${now}.` : ""}`);
+                setTimeout(() => location.replace("collection.html"), 1500);
+              }) }, "Skip"),
+            ...(p.link ? [el("a", { class: "button", href: p.link, target: "_blank", rel: "noopener" }, "Museum page ↗")] : [])),
+          ...(d.description ? [el("p", { class: "desc" }, d.description)]
+            : [el("p", { class: "muted" }, p.detailsError
+                || (p.link ? "The museum's own page has more about this painting." : ""))]),
+          el("dl", {}, ...facts.flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, String(v))])),
+          ...(d.credit ? [el("p", { class: "muted" }, d.credit)] : [])));
+    }
+
+    async function load() {
+      try {
+        render(await api(`/api/painting?name=${encodeURIComponent(name)}`));
+      } catch (e) {
+        $("info").replaceChildren(el("p", { class: "loading" }, e.message, " ",
+          el("a", { href: "collection.html" }, "Back to My collection")));
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

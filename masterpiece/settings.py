@@ -1,0 +1,76 @@
+"""User settings, stored outside the repo in %APPDATA%\\Masterpiece\\settings.json.
+
+API keys for later sources (e.g. Europeana) will live here too — never in the repo.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+from .sources import SOURCES
+
+DEFAULTS: dict = {
+    "enabledSources": list(SOURCES),
+    "knownSources": list(SOURCES),    # museums that existed when settings were saved
+    "query": "",
+    "color": "",
+    "topOnly": False,
+    "subject": "",
+    "period": "",
+    "hide": [],                   # keys from content.HIDE
+    "minWidth": "sharp",          # px as string, or "sharp" = sharp on my screens
+    "orientation": "screens",     # any|landscape|portrait|widescreen|panorama|screens|span
+    "label": True,
+    "labelPos": {"x": 0.5, "y": 0.93},   # centre of the label, fractions of the screen
+    # look: dark|light|plaque|shadow|subtle · font: sans|serif · size: s|m|l · text: full|two|artist|title
+    "labelStyle": {"look": "dark", "font": "sans", "size": "m", "text": "full"},
+    "region": "",
+    "maxFiles": 50,
+    "mode": "rotate",             # "slideshow" | "rotate" | "once"
+    "interval": 60,               # minutes between paintings (slideshow / rotate), 1 … 44640
+    "screens": "each",            # multi-monitor: "each" | "same" | "span"
+    "introSeen": False,
+    "folder": "",                 # empty = default %USERPROFILE%\Pictures\Masterpiece
+    "selection": [],              # list of Artwork dicts
+    "banned": [],                 # "never show again": [{id, title, maker, museum}]
+    "favourites": [],             # artwork IDs that come up more often in the rotation
+    "timeOfDay": False,           # brighter paintings by day, darker in the evening
+    "trayAtLogin": False,
+    "skipVersion": "",            # "Later" on an update notice: don't mention this version again
+    "apiKeys": {},
+}
+
+
+def settings_path() -> Path:
+    base = os.environ.get("APPDATA") or str(Path.home() / ".config")
+    return Path(base) / "Masterpiece" / "settings.json"
+
+
+def load() -> dict:
+    s = dict(DEFAULTS)
+    try:
+        stored = json.loads(settings_path().read_text(encoding="utf-8"))
+        s.update({k: v for k, v in stored.items() if k in DEFAULTS})
+        # Museums added in a newer version start switched on
+        known = stored.get("knownSources") or ["aic", "cleveland"]
+        s["enabledSources"] = list(s["enabledSources"]) + [
+            k for k in SOURCES if k not in known and k not in s["enabledSources"]]
+        s["knownSources"] = list(SOURCES)
+        if s["mode"] == "daily":              # older name
+            s["mode"], s["interval"] = "rotate", 1440
+    except (OSError, ValueError):
+        pass
+    return s
+
+
+def save(updates: dict) -> dict:
+    s = load()
+    s.update({k: v for k, v in updates.items() if k in DEFAULTS})
+    p = settings_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(s, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(p)
+    return s
