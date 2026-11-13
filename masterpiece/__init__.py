@@ -3,4 +3,4 @@
 __version__ = "0.3.0"
 APP_NAME = "Masterpiece"
 # GitHub "owner/repository" whose Releases hold the Setup.exe updates ("" = no update checks)
-UPDATE_REPO = "Teun-sudo1/masterpiece"
+UPDATE_REPO = "Teun-sudo1/Masterpiece"
