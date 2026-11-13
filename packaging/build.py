@@ -55,6 +55,7 @@ def main() -> int:
         "--icon", str(ico),
         "--version-file", str(version),
         "--add-data", f"{ROOT / 'masterpiece' / 'web'};masterpiece/web",
+        "--add-data", f"{ROOT / 'masterpiece' / 'data'};masterpiece/data",
         "--hidden-import", "pystray._win32",
         # app window: pywebview's Edge WebView2 backend runs through pythonnet (.NET)
         "--hidden-import", "webview.platforms.winforms",

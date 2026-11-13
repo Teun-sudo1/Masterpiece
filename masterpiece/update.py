@@ -19,6 +19,7 @@ import re
 import subprocess
 import sys
 import threading
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -91,8 +92,13 @@ def check(force: bool = False) -> dict:
     if rel is None:
         try:
             rel = _parse(json.loads(_get(API.format(repo=UPDATE_REPO)))) or {}
-        except Exception as e:                 # offline, rate-limited, no release yet, …
-            out["error"] = f"Couldn't check for updates ({type(e).__name__})."
+        except urllib.error.HTTPError as e:
+            out["error"] = ("No updates have been published yet." if e.code == 404
+                            else "GitHub is busy right now; Masterpiece tries again later." if e.code in (403, 429)
+                            else f"Couldn't check for updates (HTTP {e.code}).")
+            return out
+        except Exception:                       # offline, timeout, …
+            out["error"] = "Couldn't check for updates: no connection to GitHub."
             return out
         cache.kv().set("update:latest", rel)
     if rel:
@@ -100,6 +106,73 @@ def check(force: bool = False) -> dict:
         out["release"] = rel
         out["available"] = version_tuple(rel["version"]) > version_tuple(__version__)
     return out
+
+
+# ------------------------------------------------------------------ after an update
+
+def note_start() -> dict | None:
+    """Call once at start. After an update (any way: in-app or by running a newer Setup)
+    remembers "What's new" for the app to show once. Returns it, or None."""
+    from . import settings
+    last = settings.load().get("lastVersion") or ""
+    if last == __version__:
+        return None
+    settings.save({"lastVersion": __version__})
+    if not last or version_tuple(last) >= version_tuple(__version__):
+        return None                                   # fresh install (or a downgrade): nothing to say
+    rel = cache.kv().get("update:installing", 1e12) or {}
+    info = {"version": __version__, "from": last, "notes": "", "page": ""}
+    if rel.get("version") == __version__:
+        info.update(notes=rel.get("notes", ""), page=rel.get("page", ""))
+    cache.kv().set("update:whatsnew", info)
+    if not info["notes"] and enabled():               # updated by hand: fetch this release's notes
+        def fetch_notes():
+            try:
+                r = _parse(json.loads(_get(f"https://api.github.com/repos/{UPDATE_REPO}/releases/tags/v{__version__}")))
+                if r:
+                    cache.kv().set("update:whatsnew", {**info, "notes": r["notes"], "page": r["page"]})
+            except Exception:
+                pass
+        threading.Thread(target=fetch_notes, daemon=True).start()
+    return info
+
+
+def whats_new() -> dict | None:
+    return cache.kv().get("update:whatsnew", 1e12) or None
+
+
+def dismiss_whats_new() -> None:
+    cache.kv().set("update:whatsnew", None)
+
+
+def idle_seconds() -> float:
+    """Seconds since the last keyboard/mouse input (Windows)."""
+    if sys.platform != "win32":
+        return 0.0
+    import ctypes
+
+    class LASTINPUTINFO(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+    info = LASTINPUTINFO(ctypes.sizeof(LASTINPUTINFO), 0)
+    if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        return 0.0
+    return ((ctypes.windll.kernel32.GetTickCount() - info.dwTime) & 0xFFFFFFFF) / 1000.0
+
+
+AUTO_IDLE = 15 * 60          # automatic updates wait until nobody used the PC for 15 minutes
+
+
+def maybe_auto_install() -> str | None:
+    """With "Install updates automatically" on: install a verified update while the PC is
+    idle. Returns the version being installed, or None."""
+    from . import settings
+    if not settings.load().get("autoUpdate") or not frozen():
+        return None
+    st = check()
+    if not st["available"] or idle_seconds() < AUTO_IDLE or _progress["state"] in ("downloading", "installing"):
+        return None
+    start_install(st["release"], background=True)
+    return st["latest"]
 
 
 def updates_dir() -> Path:
@@ -118,6 +191,16 @@ def _allowed(url: str) -> bool:
 
 def download(rel: dict) -> Path:
     """Download and verify the Setup. Raises ValueError if it doesn't check out."""
+    try:
+        path = _download(rel)
+    except Exception as e:
+        _progress.update(state="error", error=str(e) or type(e).__name__)
+        raise
+    _progress.update(state="downloaded")
+    return path
+
+
+def _download(rel: dict) -> Path:
     if not _allowed(rel.get("url", "")):
         raise ValueError("Unexpected download address")
     expected = rel.get("sha256") or ""
@@ -154,20 +237,24 @@ def download(rel: dict) -> Path:
     return dest
 
 
-def install(path: Path) -> None:
-    """Start the verified Setup silently, detached; it will quit and restart Masterpiece."""
+def install(path: Path, background: bool = False) -> None:
+    """Start the verified Setup silently, detached; it will quit and restart Masterpiece
+    (in the tray only when background=True, e.g. an automatic update while you're away)."""
     DETACHED, NEW_GROUP = 0x00000008, 0x00000200
-    subprocess.Popen([str(path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"],
-                     creationflags=DETACHED | NEW_GROUP, close_fds=True)
+    args = [str(path), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]
+    if background:
+        args.append("/MPARGS=--background")          # read by the setup's [Run] section
+    subprocess.Popen(args, creationflags=DETACHED | NEW_GROUP, close_fds=True)
 
 
-def start_install(rel: dict) -> None:
+def start_install(rel: dict, background: bool = False) -> None:
     """Download + verify + install in the background; see progress()."""
     def run():
         try:
             path = download(rel)
             _progress.update(state="installing")
-            install(path)
+            cache.kv().set("update:installing", {k: rel.get(k, "") for k in ("version", "notes", "page")})
+            install(path, background)
         except Exception as e:
             _progress.update(state="error", error=str(e) or type(e).__name__)
     with _lock:

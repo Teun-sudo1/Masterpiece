@@ -260,6 +260,11 @@ main { padding: 20px 24px; }
 .update-bar b { color: var(--accent); }
 .update-actions { display: inline-flex; gap: 14px; align-items: center; }
 .update-actions button.primary { padding: 6px 14px; }
+.whats-new { align-items: flex-start; }
+.whats-new .notes { white-space: pre-line; margin-top: 6px; font-size: 14px; color: var(--text); max-height: 9.5em; overflow: auto; }
+.settings-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; text-decoration: none; }
+.settings-link:hover { color: var(--text); }
+.settings-link svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 button.link.ver { font-size: inherit; padding: 0; }
 button.link.ver.new { color: var(--accent); }
 .notice {

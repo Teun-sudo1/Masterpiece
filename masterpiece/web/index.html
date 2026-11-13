@@ -11,7 +11,7 @@
     <div class="brand">
       <h1>Masterpiece</h1>
       <p>Public-domain paintings as your Windows wallpaper · <a href="collection.html" id="collLink">My collection</a>
-        · <a href="guide.html">How it works</a>
+        · <a href="guide.html">How it works</a> · <a href="settings.html">Settings</a>
         · <button type="button" class="link ver" id="verBtn" title="Check for updates"></button></p>
     </div>
 
@@ -94,6 +94,13 @@
   </header>
 
   <main>
+    <div id="whatsNew" class="update-bar whats-new" role="status" hidden>
+      <div><b id="whatsNewTitle"></b><div class="notes" id="whatsNewNotes"></div></div>
+      <span class="update-actions">
+        <button type="button" class="link" id="whatsNewPage" hidden>Release page</button>
+        <button type="button" class="primary" id="whatsNewOk">Got it</button>
+      </span>
+    </div>
     <div id="updateBar" class="update-bar" role="status" hidden>
       <span id="updateText"></span>
       <span class="update-actions">
@@ -149,22 +156,13 @@
           <option value="1440">days</option>
         </select>
       </span>
-      <label class="check" id="todWrap" title="Brighter paintings during the day, darker and calmer ones in the evening">
-        <input type="checkbox" id="timeOfDay"> Match time of day</label>
-      <label id="screensWrap" hidden>Screens
-        <select id="screens">
-          <option value="each">Matching painting per screen</option>
-          <option value="same">Same painting on all</option>
-          <option value="span">One painting across all</option>
-        </select>
-      </label>
-      <label>Keep max
-        <input id="maxFiles" type="number" min="1" max="1000" step="1">
-      </label>
       <span class="label-opt">
         <label class="check"><input type="checkbox" id="label"> Label</label>
         <button type="button" class="link" id="labelPosBtn">style &amp; position…</button>
       </span>
+      <a href="settings.html" class="settings-link" title="Screens, time of day, lock screen, start-up, updates, storage">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        Settings</a>
     </div>
     <button id="apply" class="primary" disabled>Set as wallpaper</button>
   </footer>

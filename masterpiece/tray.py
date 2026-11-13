@@ -195,6 +195,10 @@ class Tray:
                 if UPDATE_REPO and time.monotonic() >= next_update_check:
                     next_update_check = time.monotonic() + 6 * 3600
                     self.check_updates()     # GitHub is asked at most every 12 h (cached)
+                if UPDATE_REPO and self._update and self._update.get("available"):
+                    from . import update
+                    if update.maybe_auto_install():          # only when switched on and the PC is idle
+                        next_update_check = time.monotonic() + 3600
                 self.refresh()
             except Exception:
                 pass
@@ -215,6 +219,17 @@ def run(port: int = 8765, open_browser: bool = True) -> None:
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     tray = Tray(httpd.server_address[1])
     tray.win = _app_window(tray.url)
+    try:
+        from . import update
+        updated = update.note_start()            # "What's new" after an update
+    except Exception:
+        updated = None
+    if updated:
+        def tell():
+            time.sleep(4)                        # let the icon appear first
+            tray.icon.notify(f"Masterpiece is updated to {updated['version']}. Open it to see what's new.",
+                             "Updated")
+        threading.Thread(target=tell, daemon=True).start()
     httpd.app = tray                      # a second start asks this one to show its window
     threading.Thread(target=tray._keep_fresh, daemon=True).start()
     tray.refresh()

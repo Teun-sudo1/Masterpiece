@@ -29,6 +29,8 @@ MAX_PER_HOST = 4
 HOST_LIMITS = {   # host: (max simultaneous, min seconds between requests)
     "collectionapi.metmuseum.org": (1, 0.35),
     "images.metmuseum.org": (2, 0.2),
+    "lux.collections.yale.edu": (2, 0.1),          # a university service: go easy
+    "manifests.collections.yale.edu": (2, 0.1),
 }
 _host_slots: dict[str, "_Slot"] = {}
 _host_lock = threading.Lock()

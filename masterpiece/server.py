@@ -130,6 +130,8 @@ class Handler(BaseHTTPRequestHandler):
                                        "backup": backup.has_backup()})
                 if url.path == "/api/update":
                     return self._json(self._update_status())
+                if url.path == "/api/system":
+                    return self._json(self._system_status())
                 if url.path == "/api/search":
                     return self._search(qs)
                 if url.path == "/api/img":
@@ -225,6 +227,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._collection(body)
             if path == "/api/update":
                 return self._update(body)
+            if path == "/api/system":
+                return self._system(body)
             if path == "/api/window":           # a second start of Masterpiece: show our window
                 app = getattr(self.server, "app", None)
                 if not app or not getattr(app, "win", None):
@@ -289,11 +293,52 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"ok": True})
         self._error(400, "Unknown action")
 
+    def _system_status(self) -> dict:
+        from . import __version__, desktop, storage
+        s = settings.load()
+        folder = wallpaper.resolve_folder(s.get("folder"))
+        return {"version": __version__, "startWithWindows": desktop.starts_with_windows(),
+                "screens": len(monitors.layout()["monitors"]), "folder": str(folder),
+                "storage": storage.usage(folder), "installed": desktop.FROZEN}
+
+    def _system(self, body: dict):
+        from . import desktop, storage
+        action = body.get("action")
+        if action == "startup":
+            desktop.start_with_windows(bool(body.get("on")))
+            return self._json(self._system_status())
+        if action == "freeSpace":
+            freed = storage.free_space()
+            return self._json({**self._system_status(), "freed": freed})
+        if action == "openFolder":
+            import os
+            s = settings.load()
+            target = {"paintings": wallpaper.resolve_folder(s.get("folder")),
+                      "data": wallpaper.app_dir()}.get(body.get("which"))
+            if not target:
+                return self._error(400, "Unknown folder")
+            target.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(target))                 # opens Explorer
+            return self._json({"ok": True})
+        if action == "lockScreen":
+            on = bool(body.get("on"))
+            settings.save({"lockScreen": on})
+            if on:                                    # show it there right away
+                wallpaper.refresh_labels()
+            else:
+                from . import lockscreen
+                lockscreen.restore()
+            return self._json({"ok": True, "lockScreen": on})
+        self._error(400, "Unknown action")
+
     def _update_status(self, force: bool = False) -> dict:
         from . import update
         st = update.check(force)
-        st["skipped"] = settings.load().get("skipVersion") or ""
+        s = settings.load()
+        st["skipped"] = s.get("skipVersion") or ""
+        st["autoUpdate"] = bool(s.get("autoUpdate"))
         st["progress"] = update.progress()
+        st["whatsNew"] = update.whats_new()
         return st
 
     def _update(self, body: dict):
@@ -303,6 +348,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(self._update_status(force=True))
         if action == "skip":
             settings.save({"skipVersion": str(body.get("version") or "")})
+            return self._json(self._update_status())
+        if action == "seenWhatsNew":
+            update.dismiss_whats_new()
             return self._json(self._update_status())
         if action == "install":
             st = update.check()
@@ -334,6 +382,7 @@ class Handler(BaseHTTPRequestHandler):
             style=wallpaper.label_style(body.get("labelStyle", s.get("labelStyle"))),
             favourites=s.get("favourites") or [],
             time_of_day=bool(body.get("timeOfDay", s.get("timeOfDay"))),
+            lock_screen=bool(s.get("lockScreen")),
             set_now=bool(body.get("setNow", True)),
         )
         self._json(result)

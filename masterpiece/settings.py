@@ -39,6 +39,9 @@ DEFAULTS: dict = {
     "timeOfDay": False,           # brighter paintings by day, darker in the evening
     "trayAtLogin": False,
     "skipVersion": "",            # "Later" on an update notice: don't mention this version again
+    "autoUpdate": False,          # install updates by itself while the PC is idle
+    "lastVersion": "",            # version seen at the previous start ("What's new" after an update)
+    "lockScreen": False,          # also put the painting on the Windows lock screen
     "apiKeys": {},
 }
 

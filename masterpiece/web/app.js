@@ -62,12 +62,9 @@ function saveNow() {
       label: $("label").checked,
       labelPos: state.labelPos,
       labelStyle: state.labelStyle,
-      maxFiles: Math.max(1, Number($("maxFiles").value) || 50),
       mode: $("mode").value,
       interval: intervalMinutes(),
-      screens: $("screens").value,
-      timeOfDay: $("timeOfDay").checked,
-      selection: [...state.selected.values()],
+      selection: [...state.selected.values()],      // screens, maxFiles, timeOfDay: on the Settings page
   });
 }
 
@@ -154,7 +151,6 @@ function renderOptions(s) {
   const multi = scr.length > 1;
   $("optSpan").hidden = !multi;
   $("optSpan").disabled = !multi;
-  $("screensWrap").hidden = !multi;
 }
 
 // ------------------------------------------------------------------ region map
@@ -622,7 +618,6 @@ function syncModeUi() {
   const once = $("mode").value === "once";
   $("intervalWrap").hidden = once;
   $("customWrap").hidden = once || $("interval").value !== "custom";
-  $("todWrap").hidden = $("mode").value !== "rotate";       // Windows' slideshow picks by itself
 }
 
 // ------------------------------------------------------------------ apply / restore
@@ -636,11 +631,8 @@ async function applySelection() {
       label: $("label").checked,
       labelPos: state.labelPos,
       labelStyle: state.labelStyle,
-      maxFiles: Math.max(1, Number($("maxFiles").value) || 50),
       mode: $("mode").value,
       interval: intervalMinutes(),
-      screens: $("screens").value,
-      timeOfDay: $("timeOfDay").checked,
     });
     const shown = Object.values(r.wallpapers || {});
     let msg = "";
@@ -834,9 +826,19 @@ function setupLabelDrag() {
 // ------------------------------------------------------------------ updates
 let updateInfo = null, updateTimer;
 
+function renderWhatsNew(w) {
+  $("whatsNew").hidden = !w;
+  if (!w) return;
+  $("whatsNewTitle").textContent = `Masterpiece is updated to ${w.version}.`;
+  $("whatsNewNotes").textContent = w.notes || "";
+  $("whatsNewNotes").hidden = !w.notes;
+  $("whatsNewPage").hidden = !w.page;
+}
+
 function renderUpdate(u) {
   updateInfo = u;
   clearTimeout(updateTimer);
+  renderWhatsNew(u.whatsNew);
   const ver = $("verBtn");
   ver.textContent = u.available ? `v${u.current} · update ${u.latest} available` : `v${u.current}`;
   ver.classList.toggle("new", !!u.available);
@@ -891,6 +893,14 @@ function setupUpdates() {
     } catch (e) { toast(e.message); }
   });
   $("updateNotes").addEventListener("click", () => window.open(updateInfo.release.page, "_blank", "noopener"));
+  $("whatsNewOk").addEventListener("click", () => {
+    renderWhatsNew(null);
+    api("/api/update", { action: "seenWhatsNew" }).catch(() => {});
+  });
+  $("whatsNewPage").addEventListener("click", () => {
+    const w = updateInfo && updateInfo.whatsNew;
+    if (w && w.page) window.open(w.page, "_blank", "noopener");
+  });
 }
 
 // ------------------------------------------------------------------ init
@@ -920,10 +930,7 @@ async function init() {
   $("orientation").value = s.orientation || "screens";
   if ($("orientation").value === "span" && options.screens.length < 2) $("orientation").value = "screens";
   $("label").checked = !!s.label;
-  $("timeOfDay").checked = !!s.timeOfDay;
-  $("maxFiles").value = s.maxFiles || 50;
   $("mode").value = ["slideshow", "rotate", "once"].includes(s.mode) ? s.mode : "rotate";
-  $("screens").value = s.screens || "each";
   setIntervalUi(s.interval || 60);
   api("/api/rotation").then((r) => renderRotation(r, r.backup)).catch(() => {});
   try { state.saved = new Set(await api("/api/saved")); } catch { /* badges are optional */ }
@@ -934,6 +941,10 @@ async function init() {
   setupLabelDrag();
   buildRegionMap();
   setupUpdates();
+  if (new URLSearchParams(location.search).has("label")) {       // from Settings: "Style & position…"
+    history.replaceState(null, "", "/");
+    openLabelDialog();
+  }
 
   $("search").addEventListener("submit", (e) => { e.preventDefault(); saveSettings(); search(true); });
   $("srcAll").addEventListener("click", () => setAllSources(true));
@@ -945,7 +956,7 @@ async function init() {
     $(id).addEventListener("change", scheduleSearch);
   }
   $("hide").addEventListener("change", scheduleSearch);
-  for (const id of ["maxFiles", "mode", "interval", "customN", "customUnit", "screens", "timeOfDay"]) {
+  for (const id of ["mode", "interval", "customN", "customUnit"]) {
     $(id).addEventListener("change", saveSettings);
   }
   $("label").addEventListener("change", applyLabelNow);      // label on/off shows right away

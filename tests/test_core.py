@@ -400,6 +400,87 @@ def test_update_versions():
     assert update._parse({"tag_name": "v1", "draft": True, "assets": []}) is None
 
 
+def test_nga_local_index_search():
+    from masterpiece.sources import nga
+    assert len(nga._index()) > 1000
+    r = nga.search("", subject="landscape", limit=10)
+    assert r and r.more and all(a.image_url.startswith("https://api.nga.gov/iiif/") for a in r)
+    assert all("landscape" in content_fold(a.title) or "mountain" in content_fold(a.title) for a in r)
+    assert [a.id for a in nga.search("", subject="landscape", limit=10)] == [a.id for a in r]   # stable pages
+    eu = nga.search("", region="europe", period="1850", limit=20)
+    assert eu and all(1850 <= int(re.match(r"\d{4}", a.year or "0000").group()) < 1900 for a in eu
+                      if re.match(r"\d{4}", a.year or ""))
+
+
+def content_fold(s):
+    from masterpiece import content
+    return content.fold(s)
+
+
+import re  # noqa: E402
+
+
+def test_yale_only_public_domain_paintings():
+    from masterpiece.sources import yale
+    obj = {"_label": "Sunset at Sea", "produced_by": {"timespan": {"identified_by": [{"content": "ca. 1824"}],
+           "begin_of_the_begin": "1824-01-01T00:00:00Z"},
+           "part": [{"classified_as": [{"_label": "Primary Artist"}], "carried_out_by": [{"_label": "Artist: Francis Danby"}]}]}}
+    url = "https://manifests.collections.yale.edu/ycba/obj/123"
+
+    def manifest(copyright, medium):
+        return {"metadata": [{"label": {"en": ["Copyright Statement"]}, "value": {"en": [copyright]}},
+                             {"label": {"en": ["Medium"]}, "value": {"en": [medium]}}],
+                "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+                "items": [{"width": 4000, "height": 2500, "items": [{"items": [{"body": {
+                    "service": [{"@id": "https://images.collections.yale.edu/iiif/2/ycba:abc"}]}}]}]}]}
+    a = yale._to_artwork("https://lux.collections.yale.edu/data/object/x", obj, url, manifest("Public Domain", "Oil on canvas"))
+    assert a and a.maker == "Francis Danby" and a.width == 3840 and a.museum == "Yale Center for British Art"
+    assert yale._to_artwork("x", obj, url, manifest("© Estate of the Artist", "Oil on canvas")) is None   # CC0 rights ignored
+    assert yale._to_artwork("x", obj, url, manifest("Public Domain", "Brown ink and gray wash")) is None  # a drawing
+
+
+def test_storage_usage_and_free_space(tmp_path):
+    from masterpiece import cache, storage
+    (cache.cache_dir() / "img" / "ab").mkdir(parents=True)
+    (cache.cache_dir() / "img" / "ab" / "x.jpg").write_bytes(b"x" * 5000)
+    (wallpaper.originals_dir()).mkdir(parents=True, exist_ok=True)
+    (wallpaper.originals_dir() / "aic-1.jpg").write_bytes(b"y" * 7000)
+    u = storage.usage(tmp_path / "Masterpiece")
+    parts = {p["key"]: p for p in u["parts"]}
+    assert parts["previews"]["bytes"] == 5000 and parts["originals"]["bytes"] == 7000 and u["freeable"] == 5000
+    assert storage.free_space() == 5000
+    assert not (cache.cache_dir() / "img").exists() and (wallpaper.originals_dir() / "aic-1.jpg").exists()
+
+
+def test_whats_new_after_an_update(monkeypatch):
+    from masterpiece import cache, settings, update
+    monkeypatch.setattr(update, "UPDATE_REPO", "")               # no network for the notes
+    monkeypatch.setattr(update, "__version__", "0.3.0")
+    assert update.note_start() is None                            # fresh install: nothing to show
+    monkeypatch.setattr(update, "__version__", "0.4.0")
+    cache.kv().set("update:installing", {"version": "0.4.0", "notes": "Lock screen!", "page": "https://x"})
+    w = update.note_start()
+    assert w["version"] == "0.4.0" and w["from"] == "0.3.0" and w["notes"] == "Lock screen!"
+    assert update.whats_new()["notes"] == "Lock screen!" and update.note_start() is None   # only once
+    update.dismiss_whats_new()
+    assert update.whats_new() is None and settings.load()["lastVersion"] == "0.4.0"
+
+
+def test_auto_update_only_when_on_installed_and_idle(monkeypatch):
+    from masterpiece import settings, update
+    started = []
+    monkeypatch.setattr(update, "start_install", lambda rel, background=False: started.append(background))
+    monkeypatch.setattr(update, "check", lambda force=False: {"available": True, "latest": "9.0.0", "release": {}})
+    monkeypatch.setattr(update, "frozen", lambda: True)
+    monkeypatch.setattr(update, "idle_seconds", lambda: 3600)
+    assert update.maybe_auto_install() is None                    # switched off by default
+    settings.save({"autoUpdate": True})
+    monkeypatch.setattr(update, "idle_seconds", lambda: 30)
+    assert update.maybe_auto_install() is None                    # someone is using the PC
+    monkeypatch.setattr(update, "idle_seconds", lambda: 3600)
+    assert update.maybe_auto_install() == "9.0.0" and started == [True]   # restarts in the tray only
+
+
 def test_html_to_text():
     from masterpiece import content
     assert content.html_to_text("<p>One &amp; <em>two</em></p><p>Three</p>") == "One & two\n\nThree"

@@ -70,6 +70,12 @@ Click a painting for its info card with the museum's description (Chicago, Cleve
   another one on that screen; other screens keep theirs.
 - **Match time of day** (rotation only): brighter paintings by day, darker ones in the evening.
 - Changing the label (on/off, style, position) updates the paintings on screen right away.
+- **Settings** page: screens, time of day, label, how many to keep, **lock screen** (the painting
+  on the Windows lock screen too; your own picture comes back when you switch it off), start with
+  Windows, updates (check now, *install automatically* while you're away), and **storage**
+  (what takes how much space, *Free up space*, open the folders).
+- **Updates**: installed copies offer new versions from GitHub (*Install now*); after an update
+  Masterpiece shows what's new.
 
 ### As a Windows program (Setup.exe)
 
@@ -121,12 +127,15 @@ Settings are stored in `%APPDATA%\Masterpiece\settings.json` (never in the repo)
 | [SMK – National Gallery of Denmark](https://open.smk.dk/) | [api.smk.dk](https://api.smk.dk/api/v1/) | none | Public Domain Mark |
 | [The Metropolitan Museum of Art](https://www.metmuseum.org/hubs/open-access) | [collectionapi.metmuseum.org](https://metmuseum.github.io/) | none | CC0 (Open Access) |
 | [Japan Search](https://jpsearch.go.jp/) (Tokyo Museum Collection and others) | jpsearch.go.jp/api | none | Public Domain Mark only; images ≈1000 px |
+| [National Gallery of Art, Washington](https://www.nga.gov/open-access-images.html) | [open data on GitHub](https://github.com/NationalGalleryOfArt/opendata) (no search API: a local index of ≈2900 paintings ships with the app, `packaging/nga_index.py`) | none | CC0 (open-access images) |
+| [Yale Center for British Art](https://britishart.yale.edu/) & [Yale University Art Gallery](https://artgallery.yale.edu/) | [LUX](https://lux.collections.yale.edu/) (Linked Art) + IIIF manifests | none | Only works marked "Copyright Statement: Public domain" |
 
 The **Region** filter (Europe, the Americas, East & South Asia, Middle East & Islamic world)
 works across museums; the Met adds Chinese & Japanese paintings, Japanese woodblock prints
 and Persian/Mughal manuscript paintings. Museums with little from a region are skipped.
 
-Planned: Europeana (optional key).
+Planned: Europeana and Paris Musées (both need a free personal key, which would be entered in
+the app and never stored in the repository).
 
 Local data: settings in `%APPDATA%\Masterpiece`, cache / originals / current renders in
 `%LOCALAPPDATA%\Masterpiece` (safe to delete), paintings in `Pictures\Masterpiece`.

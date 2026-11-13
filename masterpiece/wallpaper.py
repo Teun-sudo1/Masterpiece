@@ -435,6 +435,22 @@ def _source_for(p: Path) -> tuple[Path, bool]:
     return p, cache.kv().get(f"labelled:{p.name}", 1e12) is False
 
 
+def _to_lock_screen(paths: dict, chosen: dict, main: dict) -> None:
+    """The main screen's painting (with its label) on the lock screen as well."""
+    from . import lockscreen
+    try:
+        if "span" in paths:                          # spanned: cut out the main screen's part
+            _, _, _, region = chosen["span"]
+            src = current_dir() / "lock-src.jpg"
+            with Image.open(paths["span"]) as im:
+                im.crop(region).save(src, "JPEG", quality=92)
+        else:
+            src = paths.get(main.get("id")) or paths.get("all") or next(iter(paths.values()))
+        lockscreen.set_image(Path(src))
+    except Exception as e:                           # never let this break the wallpaper
+        print(f"Lock screen not changed: {e}", file=sys.stderr)
+
+
 FAVOURITE_WEIGHT = 3.0      # a favourite comes up about 3× as often
 
 
@@ -493,7 +509,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               pos: tuple[float, float] = DEFAULT_LABEL_POS,
               force: str | None = None, style: dict | None = None,
               favourites=None, time_of_day: bool = False,
-              keep: dict | None = None) -> dict:
+              keep: dict | None = None, lock_screen: bool = False) -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -591,6 +607,8 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
             monitors.set_each({k: str(v) for k, v in paths.items()})
     except OSError:
         set_wallpaper(next(iter(paths.values())))      # older Windows: one image everywhere
+    if lock_screen and Image is not None:
+        _to_lock_screen(paths, chosen, main)
 
     # Remember what was shown, so the next rotation picks something else
     shown = [p.name for p, *_ in chosen.values()]
@@ -638,7 +656,8 @@ def show_from_settings(s: dict | None = None, **kw) -> dict:
     s = s or _settings.load()
     return show_next(resolve_folder(s.get("folder")), s.get("screens", "each"), bool(s.get("label", True)),
                      pos=label_pos(s.get("labelPos")), style=label_style(s.get("labelStyle")),
-                     favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")), **kw)
+                     favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")),
+                     lock_screen=bool(s.get("lockScreen")), **kw)
 
 
 def relabel_folder(folder: Path, label: bool, pos=DEFAULT_LABEL_POS, style: dict | None = None) -> int:
@@ -822,7 +841,7 @@ def open_background_settings() -> None:
 def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
           mode: str, screens: str = "each", interval: int = 60, set_now: bool = True,
           pos: tuple[float, float] = DEFAULT_LABEL_POS, style: dict | None = None,
-          favourites=None, time_of_day: bool = False) -> dict:
+          favourites=None, time_of_day: bool = False, lock_screen: bool = False) -> dict:
     if mode == "daily":                    # settings from older versions
         mode, interval = "rotate", 1440
     interval = max(1, min(int(interval), 31 * 1440))
@@ -866,12 +885,13 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
             open_background_settings()
     elif mode == "rotate":
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
-                                         favourites=favourites, time_of_day=time_of_day)
+                                         favourites=favourites, time_of_day=time_of_day,
+                                         lock_screen=lock_screen)
         schedule.enable(interval)
     else:
         schedule.disable()
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
-                                         favourites=favourites)
+                                         favourites=favourites, lock_screen=lock_screen)
     result["rotation"] = schedule.status()
     result["backup"] = backup.has_backup()
     return result

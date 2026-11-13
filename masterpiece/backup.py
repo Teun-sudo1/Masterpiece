@@ -83,8 +83,13 @@ def _windows_default() -> str | None:
 
 
 def restore() -> dict:
-    """Stop the rotation and bring back the wallpaper from before Masterpiece."""
+    """Stop the rotation and bring back the wallpaper (and lock screen) from before Masterpiece."""
     schedule.disable()
+    try:
+        from . import lockscreen
+        lockscreen.restore()
+    except Exception:
+        pass                                  # the desktop wallpaper matters most
     state = cache.kv().get(KEY, 1e12)
     if state:
         monitors.restore(state["snap"], state["files"])

@@ -22,7 +22,7 @@ masterpiece = "masterpiece.__main__:main"
 include = ["masterpiece*"]
 
 [tool.setuptools.package-data]
-masterpiece = ["web/*"]
+masterpiece = ["web/*", "data/*"]
 
 [tool.pytest.ini_options]
 markers = ["live: hits the real museum APIs (deselect with -m 'not live')"]

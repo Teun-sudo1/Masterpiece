@@ -65,7 +65,7 @@ Name: "{userstartup}\Masterpiece"; Filename: "{app}\Masterpiece.exe"; Parameters
 Filename: "{app}\Masterpiece.exe"; Parameters: "relink"; Flags: runhidden waituntilterminated
 Filename: "{app}\Masterpiece.exe"; Description: "Open Masterpiece now"; Flags: nowait postinstall skipifsilent
 ; an update from inside Masterpiece runs this setup silently: start the new version again
-Filename: "{app}\Masterpiece.exe"; Flags: nowait; Check: WizardSilent
+Filename: "{app}\Masterpiece.exe"; Parameters: "{param:mpargs|}"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{app}\Masterpiece.exe"; Parameters: "cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "MasterpieceCleanup"
