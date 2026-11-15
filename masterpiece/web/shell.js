@@ -72,17 +72,20 @@ const TABS = [
 ];
 
 function mountShell(active) {
-  const logo = el("span", { class: "logo", "aria-hidden": "true" });
-  logo.innerHTML = '<svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5"/>' +
-    '<path d="M5 16.5l4.5-5 3.5 3.5 2.5-2.5 3.5 4"/><circle cx="15.5" cy="9" r="1.6"/></svg>';
-  const bar = el("header", { class: "appbar" },
-    el("a", { class: "brand", href: "/" }, logo, el("span", {}, "Masterpiece")),
-    el("nav", { class: "tabs", "aria-label": "Sections" },
-      ...TABS.map(([key, label, href]) => el("a", {
-        href, class: `tab${key === active ? " on" : ""}`, "aria-current": key === active ? "page" : false,
-        "data-tab": key }, label, key === "collection" ? el("span", { class: "tab-count", id: "collCount" }) : null))),
-    el("button", { type: "button", class: "ver", id: "verBtn", title: "Check for updates" }));
-  document.body.prepend(bar);
+  // The top bar is written in every page's HTML (so nothing moves while a page loads);
+  // here it only gets wired up. Older pages without it get one built.
+  let bar = document.querySelector(".appbar");
+  if (!bar) {
+    bar = el("header", { class: "appbar" },
+      el("a", { class: "brand", href: "/" }, el("span", {}, "Masterpiece")),
+      el("nav", { class: "tabs", "aria-label": "Sections" },
+        ...TABS.map(([key, label, href]) => el("a", {
+          href, class: `tab${key === active ? " on" : ""}`, "aria-current": key === active ? "page" : false,
+          "data-tab": key }, label, key === "collection" ? el("span", { class: "tab-count", id: "collCount" }) : null))),
+      el("button", { type: "button", class: "ver", id: "verBtn", title: "Check for updates" }));
+    document.body.prepend(bar);
+  }
+  try { setCollectionCount(Number(sessionStorage.getItem("collCount")) || 0); } catch { /* fine */ }
   const banners = el("div", { class: "banners", id: "banners" },
     el("div", { id: "whatsNew", class: "banner whats-new", role: "status", hidden: true },
       el("div", {}, el("b", { id: "whatsNewTitle" }), el("div", { class: "notes", id: "whatsNewNotes" })),
@@ -104,6 +107,7 @@ function mountShell(active) {
 function setCollectionCount(n) {
   const c = $("collCount");
   if (c) c.textContent = n ? String(n) : "";
+  try { sessionStorage.setItem("collCount", String(n || 0)); } catch { /* fine */ }
 }
 
 // ------------------------------------------------------------------ updates

@@ -62,7 +62,8 @@ _unions = UnionCache()
 def _queries(query: str, subject: str | None, region: str | None) -> list[dict]:
     words = [w for w in [query.strip(), content.SUBJECTS.get(subject, {}).get("keyword")] if w]
     out = []
-    for museum in REGION_MUSEUMS.get(region, list(MUSEUMS)):
+    chosen = [m for r in sorted(content.regions_of(region)) for m in REGION_MUSEUMS.get(r, [])]
+    for museum in list(dict.fromkeys(chosen)) or list(MUSEUMS):
         terms = [{"classification": {"name": "paintings"}}, {"memberOf": {"name": MUSEUMS[museum]}},
                  {"hasDigitalImage": 1}] + [{"text": w} for w in words]
         out.append({"AND": terms})

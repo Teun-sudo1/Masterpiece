@@ -872,3 +872,21 @@ def test_taste_sliders_steer_the_curator():
     assert not any(p.get("surprise") for p in plans)                # surprise: never
     assert sum(p["period"] == "1850" for p in plans) > 10           # "a lot" of 1850–1900
     assert curator._museums({"curatorTaste": {"museums": {"aic": 0}}}, ["aic", "nga"], 3, random.Random(1)) == ["nga"]
+
+
+def test_several_regions_at_once(monkeypatch):
+    from masterpiece import content, search
+    from masterpiece.sources import aic, nga
+    assert content.regions_of("europe,asia,bogus") == {"europe", "asia"} and content.regions_of("") == set()
+    seen = {}
+
+    def fake_page(mod, page, api_args):
+        seen[mod.KEY] = api_args.get("region")
+        return search.Results([], more=False)
+    monkeypatch.setattr(search, "_page", fake_page)
+    r = search.search_all(["aic", "nga", "rijks", "jps"], region="europe,americas")
+    assert r["skipped"] == ["jps"]                       # Japan Search has nothing from either
+    assert seen["aic"] == "americas,europe" and seen["nga"] is None and seen["rijks"] is None
+    q = aic._query(None, False, region="europe,asia")    # one OR-filter for both regions
+    assert any("should" in f.get("bool", {}) for f in q["bool"]["filter"])
+    assert len(nga.search("", region="europe,americas", limit=5)) == 5

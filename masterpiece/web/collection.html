@@ -5,8 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My collection · Masterpiece</title>
   <link rel="stylesheet" href="styles.css">
+  <script type="speculationrules">{"prerender": [{"where": {"href_matches": "/*"}, "eagerness": "moderate"}]}</script>
 </head>
 <body>
+  <header class="appbar">
+    <a class="brand" href="/"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5"/><path d="M5 16.5l4.5-5 3.5 3.5 2.5-2.5 3.5 4"/><circle cx="15.5" cy="9" r="1.6"/></svg></span><span>Masterpiece</span></a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="/" class="tab" data-tab="search">Search art</a>
+      <a href="collection.html" class="tab on" aria-current="page" data-tab="collection">My collection<span class="tab-count" id="collCount"></span></a>
+      <a href="curator.html" class="tab" data-tab="curator">Curator</a>
+      <a href="settings.html" class="tab" data-tab="settings">Settings</a>
+    </nav>
+    <button type="button" class="ver" id="verBtn" title="Check for updates"></button>
+  </header>
   <div class="layout" id="layout">
     <aside class="panel" id="panel" aria-label="Filters">
       <div class="panel-head">

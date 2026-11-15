@@ -13,7 +13,8 @@ const state = {
   gen: 0,                  // search generation, to drop stale responses
   pending: new Set(),      // museums still answering
   errors: {},
-  skipped: new Set(),      // museums without works from the chosen region
+  skipped: new Set(),      // museums without works from the chosen regions
+  regions: new Set(),      // chosen regions (empty = everywhere); several at once is fine
   lbIndex: -1,
 };
 
@@ -27,7 +28,7 @@ function saveSettings() {
     query: $("q").value.trim(),
     color: $("color").value,
     topOnly: $("topOnly").checked,
-    region: $("region").value,
+    region: regionValue(),
     subject: $("subject").value,
     period: $("period").value,
     hide: hideValues(),
@@ -44,7 +45,6 @@ function currentList() {
 // ------------------------------------------------------------------ options
 function renderOptions(s) {
   const o = state.options;
-  for (const x of o.regions || []) $("region").append(el("option", { value: x.key }, x.label));
   for (const x of o.subjects) $("subject").append(el("option", { value: x.key }, x.label));
   for (const x of o.periods) $("period").append(el("option", { value: x.key }, x.label));
   $("hide").replaceChildren(...o.hide.map((x) => el("label", { class: "check" },
@@ -145,9 +145,9 @@ function buildRegionMap() {
     const t = svgEl("text", { class: "name", x: lx, y: ly });
     t.textContent = (labels[key] || key).replace(" & Islamic world", "").replace("East & South ", "");
     g.append(t);
-    g.addEventListener("click", () => chooseRegion($("region").value === key ? "" : key));
+    g.addEventListener("click", () => toggleRegion(key));
     g.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); chooseRegion(key); }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleRegion(key); }
     });
     g.addEventListener("pointerenter", () => showMapTip(g, key));
     g.addEventListener("pointerleave", () => ($("mapTip").hidden = true));
@@ -156,7 +156,7 @@ function buildRegionMap() {
 
   $("regionList").replaceChildren(
     ...[{ key: "", label: "Everywhere" }, ...(state.options.regions || [])].map((r) =>
-      el("button", { type: "button", "data-region": r.key, onclick: () => chooseRegion(r.key) }, r.label)));
+      el("button", { type: "button", "data-region": r.key, onclick: () => toggleRegion(r.key) }, r.label)));
   syncRegionUi();
 }
 
@@ -170,35 +170,41 @@ function showMapTip(g, key) {
   tip.hidden = false;
 }
 
-function chooseRegion(key) {
-  $("region").value = key;
+const regionValue = () => [...state.regions].sort().join(",");
+
+// Click a continent to add it, click again to remove it; "Everywhere" clears them all.
+function toggleRegion(key) {
+  if (!key) state.regions.clear();
+  else if (state.regions.has(key)) state.regions.delete(key);
+  else state.regions.add(key);
+  if (state.regions.size === (state.options.regions || []).length) state.regions.clear();   // all = everywhere
   syncRegionUi();
   scheduleSearch();
 }
 
 function syncRegionUi() {
-  const key = $("region").value;
+  const on = state.regions;
   for (const g of document.querySelectorAll("#worldMap .region")) {
-    g.classList.toggle("on", g.dataset.region === key);
-    g.setAttribute("aria-pressed", String(g.dataset.region === key));
+    g.classList.toggle("on", on.has(g.dataset.region));
+    g.setAttribute("aria-pressed", String(on.has(g.dataset.region)));
   }
   for (const b of document.querySelectorAll("#regionList button")) {
-    b.setAttribute("aria-pressed", String(b.dataset.region === key));
+    b.setAttribute("aria-pressed", String(b.dataset.region ? on.has(b.dataset.region) : on.size === 0));
   }
-  $("regionSummary").textContent = key
-    ? (state.options.regions.find((r) => r.key === key) || {}).label || key : "Everywhere";
+  const labels = (state.options.regions || []).filter((r) => on.has(r.key)).map((r) => r.label.split(" & ")[0]);
+  $("regionSummary").textContent = !on.size ? "Everywhere" : on.size === 1 ? labels[0] : `${on.size} regions`;
 }
 
 // ------------------------------------------------------------------ museums
 function renderSources() {
   const sorted = [...state.sources].sort((a, b) => a.name.localeCompare(b.name));
   $("sources").replaceChildren(...sorted.map((s) =>
-    el("label", { class: "check", title: [s.license, s.note].filter(Boolean).join(" · ") },
+    el("label", { class: "check", title: s.license || "" },
       el("input", {
         type: "checkbox", checked: s.enabled,
         onchange: (e) => { s.enabled = e.target.checked; updateSourcesSummary(); scheduleSearch(); },
       }),
-      el("span", { class: "name" }, s.name, s.note ? el("em", {}, s.note) : null))));
+      el("span", { class: "name" }, s.name))));
   updateSourcesSummary();
 }
 
@@ -231,7 +237,7 @@ function searchParams() {
     q: $("q").value.trim(),
     color: $("color").value,
     top: $("topOnly").checked ? "1" : "",
-    region: $("region").value,
+    region: regionValue(),
     subject: $("subject").value,
     period: $("period").value,
     hide: hideValues().join(","),
@@ -312,7 +318,7 @@ function showErrors() {
   notice.hidden = !parts.length;
   const skipped = [...state.skipped].map(sourceName);
   $("regionNote").textContent = skipped.length
-    ? `Not searched for this region: ${skipped.join(", ")} (little or nothing from there).` : "";
+    ? `Not searched for ${state.regions.size > 1 ? "these regions" : "this region"}: ${skipped.join(", ")} (little or nothing from there).` : "";
   $("regionNote").hidden = !skipped.length;
 }
 
@@ -523,6 +529,8 @@ function step(d) {
 
 // ------------------------------------------------------------------ init
 async function init() {
+  mountShell("search");
+  setupPanel("search");
   const [sources, options, s] = await Promise.all([
     api("/api/sources"), api("/api/options"), api("/api/settings"),
   ]);
@@ -530,8 +538,6 @@ async function init() {
     location.replace("guide.html");
     return;
   }
-  mountShell("search");
-  setupPanel("search");
   state.options = options;
   state.sources = sources.map((src) => ({ ...src, enabled: s.enabledSources.includes(src.key) }));
   for (const a of s.selection || []) state.selected.set(a.id, a);
@@ -540,7 +546,7 @@ async function init() {
   $("q").value = s.query || "";
   $("color").value = s.color || "";
   $("topOnly").checked = !!s.topOnly;
-  $("region").value = s.region || "";
+  state.regions = new Set(String(s.region || "").split(",").filter(Boolean));
   $("subject").value = s.subject || "";
   $("period").value = s.period || "";
   $("minWidth").value = String(s.minWidth ?? "sharp");
@@ -557,7 +563,7 @@ async function init() {
   $("q").addEventListener("search", () => { if (!$("q").value) scheduleSearch(); });   // the x in the box
   $("srcAll").addEventListener("click", () => setAllSources(true));
   $("srcNone").addEventListener("click", () => setAllSources(false));
-  for (const id of ["color", "topOnly", "minWidth", "orientation", "region", "subject", "period"]) {
+  for (const id of ["color", "topOnly", "minWidth", "orientation", "subject", "period"]) {
     $(id).addEventListener("change", scheduleSearch);
   }
   $("hide").addEventListener("change", () => { updateHideSummary(); scheduleSearch(); });

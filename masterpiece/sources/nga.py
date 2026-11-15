@@ -83,6 +83,7 @@ def search(query: str = "", page: int = 1, color: str | None = None,
     words = content.fold(query).split()
     subj = _subject_words(subject)
     p = content.PERIODS.get(period)
+    regions = content.regions_of(region)
     hits = []
     for r in _index():
         if words and not all(w in r["_hay"] for w in words):
@@ -91,7 +92,7 @@ def search(query: str = "", page: int = 1, color: str | None = None,
             continue
         if p and not (r["year"] is not None and p["start"] <= r["year"] < p["end"]):
             continue
-        if region and r["region"] != region:
+        if regions and r["region"] not in regions:
             continue
         hits.append(r)
     # A stable mix (not just accession order), the same for every page of this search

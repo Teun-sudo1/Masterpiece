@@ -82,7 +82,8 @@ def _param_sets(query: str, subject: str | None, period: str | None,
     if period in content.PERIODS:
         p = content.PERIODS[period]
         base["dateBegin"], base["dateEnd"] = p["start"], p["end"]
-    regions = [region] if region in DEPARTMENTS else DEFAULT_ORDER
+    chosen = content.regions_of(region)
+    regions = [r for r in DEFAULT_ORDER if r in chosen] or [r for r in DEPARTMENTS if r in chosen] or DEFAULT_ORDER
     sets = []
     for r in regions:
         for d, m, extra in DEPARTMENTS[r]:

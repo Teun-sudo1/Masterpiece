@@ -60,8 +60,9 @@ def _query(color: str | None, top_only: bool, subject: str | None = None,
     if period in content.PERIODS:
         p = content.PERIODS[period]
         filters.append({"range": {"date_start": {"gte": p["start"], "lt": p["end"]}}})
-    if region in REGION_FILTERS:
-        filters.append(REGION_FILTERS[region])
+    regions = [REGION_FILTERS[r] for r in sorted(content.regions_of(region)) if r in REGION_FILTERS]
+    if regions:
+        filters.append(regions[0] if len(regions) == 1 else {"bool": {"should": regions, "minimum_should_match": 1}})
     for h in hide:
         if h in content.HIDE:
             must_not.append({"terms": {"subject_titles.keyword": content.HIDE[h]["aic"]}})

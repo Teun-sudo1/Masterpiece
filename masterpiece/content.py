@@ -124,6 +124,14 @@ _HIDE_RE = {k: re.compile(v["pattern"], re.I) for k, v in HIDE.items()}
 TEXT_CHARS = 400   # how much description text adapters keep for the hide check
 
 
+def regions_of(value) -> set[str]:
+    """A region filter can hold several regions: "europe,asia" -> {"europe", "asia"}."""
+    if not value:
+        return set()
+    items = value.split(",") if isinstance(value, str) else value
+    return {r.strip() for r in items if r and r.strip() in REGIONS}
+
+
 def hidden(text: str, hide: list[str] | tuple[str, ...]) -> bool:
     return any(_HIDE_RE[k].search(text) for k in hide if k in _HIDE_RE)
 

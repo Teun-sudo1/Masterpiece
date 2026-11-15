@@ -12,7 +12,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from itertools import zip_longest
 
-from . import cache, filters
+from . import cache, content, filters
 from .models import Artwork, Results
 from .net import Blocked
 from .sources import SOURCES
@@ -59,13 +59,25 @@ def search_all(source_keys: list[str], *, cursors: dict[str, int] | None = None,
                max_pages: int = MAX_PAGES_PER_CALL) -> dict:
     cursors = cursors or {}
     keys = [k for k in source_keys if k in SOURCES and cursors.get(k, 1) > 0]
-    # A museum that has (almost) nothing from the chosen region is skipped
-    skipped = [k for k in keys if region and region not in getattr(SOURCES[k], "REGIONS", ())]
+    # Several regions can be chosen. A museum with (almost) nothing from any of them is skipped;
+    # the others get only the chosen regions they have (none at all = no filter needed).
+    chosen = content.regions_of(region)
+    per_region: dict[str, str | None] = {}
+    skipped = []
+    for k in keys:
+        has = set(getattr(SOURCES[k], "REGIONS", ()))
+        if not chosen:
+            per_region[k] = None
+        elif not chosen & has:
+            skipped.append(k)
+        else:
+            per_region[k] = None if has <= chosen else ",".join(sorted(chosen & has))
     keys = [k for k in keys if k not in skipped]
     api_args = dict(query=query, color=color, top_only=top_only,
                     subject=subject, period=period, hide=tuple(hide))
-    if region:
-        api_args["region"] = region
+
+    def args_for(k: str) -> dict:
+        return {**api_args, "region": per_region[k]} if per_region.get(k) else api_args
     filter_args = dict(min_width=min_width, orientation=orientation,
                        targets=targets, sharp=sharp, hide=tuple(hide))
 
@@ -75,7 +87,7 @@ def search_all(source_keys: list[str], *, cursors: dict[str, int] | None = None,
     scanned = 0
 
     with ThreadPoolExecutor(max_workers=max(1, len(keys))) as ex:
-        futures = {k: ex.submit(_collect, SOURCES[k], cursors.get(k, 1), api_args, filter_args, set(), max_pages)
+        futures = {k: ex.submit(_collect, SOURCES[k], cursors.get(k, 1), args_for(k), filter_args, set(), max_pages)
                    for k in keys}
         for k, fut in futures.items():
             try:

@@ -128,7 +128,7 @@ def search(query: str = "", page: int = 1, color: str | None = None,
     data = get_json(API, params=params, timeout=TIMEOUT)
     total = int((data.get("info") or {}).get("total") or 0)
     words = _fold(query).split()
-    depts = REGION_DEPARTMENTS.get(region)
+    depts = set().union(*(REGION_DEPARTMENTS[r] for r in content.regions_of(region) if r in REGION_DEPARTMENTS))
     items = (_to_artwork(d) for d in data.get("data") or []
              if _matches_query(d, words) and (not depts or d.get("department") in depts))
     return Results((a for a in items if a), more=skip + limit < total)
