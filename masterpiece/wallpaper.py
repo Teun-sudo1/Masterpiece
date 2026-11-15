@@ -110,15 +110,16 @@ def label_style(value) -> dict:
 def label_lines(a: Artwork | dict, mode: str = "full") -> list[str]:
     """The label's line(s) for one painting, depending on the chosen text."""
     g = (lambda k: (a.get(k) or "")) if isinstance(a, dict) else (lambda k: getattr(a, k) or "")
-    title, maker, year, museum = g("title"), g("maker"), str(g("year")), g("museum")
+    title, maker, museum = g("title"), g("maker"), g("museum")
+    year = " ".join(str(g("year")).split())[:24]           # the painting's date: "1889", "c. 1665", …
+    by = ", ".join(x for x in (maker, year) if x)           # "Claude Monet, 1891"
     if mode == "title":
-        return [title]
+        return [f"{title} ({year})" if year else title]
     if mode == "artist":
-        return [" — ".join(x for x in (title, maker) if x)]
+        return [" — ".join(x for x in (title, by) if x)]
     if mode == "two":
-        details = ", ".join(x for x in (maker, year) if x)
-        return [title, " · ".join(x for x in (details, museum) if x)]
-    return [label_text(a)]
+        return [title, " · ".join(x for x in (by, museum) if x)]
+    return [" · ".join(x for x in (" — ".join(x for x in (title, by) if x), museum) if x)]
 
 
 DEFAULT_LABEL_POS = (0.5, 0.93)   # centre of the label, as fractions of the screen: bottom-centre

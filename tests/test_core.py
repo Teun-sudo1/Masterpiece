@@ -530,8 +530,10 @@ def test_label_styles():
         **wallpaper.DEFAULT_LABEL_STYLE, "look": "plaque"}             # unknown values fall back
     a = {"title": "The Harvesters", "maker": "Bruegel", "year": "1565", "museum": "The Met"}
     assert wallpaper.label_lines(a, "two") == ["The Harvesters", "Bruegel, 1565 · The Met"]
-    assert wallpaper.label_lines(a, "title") == ["The Harvesters"]
-    assert wallpaper.label_lines(a, "artist") == ["The Harvesters — Bruegel"]
+    assert wallpaper.label_lines(a, "title") == ["The Harvesters (1565)"]
+    assert wallpaper.label_lines(a, "artist") == ["The Harvesters — Bruegel, 1565"]
+    assert wallpaper.label_lines(a, "full") == ["The Harvesters — Bruegel, 1565 · The Met"]
+    assert wallpaper.label_lines({**a, "year": ""}, "full") == ["The Harvesters — Bruegel · The Met"]
     base = PIL.new("RGB", (1600, 900), (90, 120, 160))
     for look in wallpaper.LABEL_LOOKS:
         for text in wallpaper.LABEL_TEXTS:
@@ -890,3 +892,26 @@ def test_several_regions_at_once(monkeypatch):
     q = aic._query(None, False, region="europe,asia")    # one OR-filter for both regions
     assert any("should" in f.get("bool", {}) for f in q["bool"]["filter"])
     assert len(nga.search("", region="europe,americas", limit=5)) == 5
+
+
+def test_wikidata_thumbs_and_local_search(monkeypatch):
+    from masterpiece.sources import wikidata
+    url = "https://upload.wikimedia.org/wikipedia/commons/a/ab/Some_painting.jpg"
+    assert wikidata._thumb(url, 6000, 960) == \
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Some_painting.jpg/960px-Some_painting.jpg"
+    assert wikidata._thumb(url, 1200, 1920) == url           # not bigger than the original
+    rows = [{"qid": f"Q{n}", "title": t, "maker": m, "date": d, "year": int(d) if d else None,
+             "museum": "Museo Nacional", "url": url, "width": 5000, "height": 4000, "region": reg}
+            for n, (t, m, d, reg) in enumerate([("Paisaje con río", "José María Velasco", "1882", "latam"),
+                                                ("Bush landscape", "Tom Roberts", "1890", "oceania"),
+                                                ("Portrait", "Someone", "", "europe")])]
+    for r in rows:
+        r["_hay"] = wikidata.content.fold(f"{r['title']} {r['maker']} {r['museum']}")
+        r["_title"] = wikidata.content.fold(r["title"])
+    monkeypatch.setattr(wikidata, "_rows", rows)
+    assert {a.maker for a in wikidata.search("", region="latam,oceania")} == {"José María Velasco", "Tom Roberts"}
+    a = wikidata.search("velasco")[0]
+    assert a.id == "wikidata-Q0" and a.link == "https://www.wikidata.org/wiki/Q0"
+    assert a.image_url.endswith("/3840px-Some_painting.jpg") and a.width == 3840 and a.height == 3072
+    assert a.thumb_url.endswith("/500px-Some_painting.jpg")
+    assert [x.maker for x in wikidata.search("", period="1850")] != []

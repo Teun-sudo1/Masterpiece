@@ -4,7 +4,7 @@
 const LABEL_SIZE_DIV = { s: 72, m: 55, l: 40 };      // same as wallpaper.LABEL_SIZES
 const LABEL_OPTIONS = {
   look: [["dark", "Dark"], ["light", "Light"], ["plaque", "Museum plaque"], ["shadow", "Shadow"], ["subtle", "Subtle"]],
-  text: [["full", "Title — Artist · Museum"], ["two", "Two lines"], ["artist", "Title — Artist"], ["title", "Title only"]],
+  text: [["full", "Title — Artist, year · Museum"], ["two", "Two lines"], ["artist", "Title — Artist, year"], ["title", "Title (year)"]],
   font: [["sans", "Sans"], ["serif", "Serif"]],
   size: [["s", "S"], ["m", "M"], ["l", "L"]],
 };
@@ -13,12 +13,14 @@ const PRESETS = [["0.5,0.93", "bottom centre"], ["0.5,0.5", "centre"], ["0.86,0.
 const labelDlg = { pos: { x: 0.5, y: 0.93 }, style: { look: "dark", font: "sans", size: "m", text: "full" },
                    screens: [], sample: null, onDone: null };
 
-function labelLines(a, mode) {          // mirrors wallpaper.label_lines
+function labelLines(a, mode) {          // mirrors wallpaper.label_lines (with the painting's date)
   const j = (sep, ...xs) => xs.filter(Boolean).join(sep);
-  if (mode === "title") return [a.title];
-  if (mode === "artist") return [j(" — ", a.title, a.maker)];
-  if (mode === "two") return [a.title, j(" · ", j(", ", a.maker, a.year), a.museum)];
-  return [`${a.title} — ${a.maker} · ${a.museum}`];
+  const year = String(a.year || "").trim().slice(0, 24);
+  const by = j(", ", a.maker, year);
+  if (mode === "title") return [year ? `${a.title} (${year})` : a.title];
+  if (mode === "artist") return [j(" — ", a.title, by)];
+  if (mode === "two") return [a.title, j(" · ", by, a.museum)];
+  return [j(" · ", j(" — ", a.title, by), a.museum)];
 }
 
 function buildLabelDialog() {

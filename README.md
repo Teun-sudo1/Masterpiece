@@ -13,7 +13,7 @@ every day it adds a few new paintings that suit your taste.
 
 ## Four tabs
 
-**Search art** — search nine museums at once. The filter panel on the left (collapsible) has
+**Search art** — search ten sources at once. The filter panel on the left (collapsible) has
 museums, a region map, subject, period, colour, highlights, shape ("fits my screens", "spans all
 my screens", portrait, panorama…), resolution ("sharp on my screens") and *hide* religious scenes /
 nudes / death & war. Click a painting for a large preview; select with **+** and press
@@ -120,11 +120,12 @@ Settings are stored in `%APPDATA%\Masterpiece\settings.json` (never in the repo)
 | [The Metropolitan Museum of Art](https://www.metmuseum.org/hubs/open-access) | [collectionapi.metmuseum.org](https://metmuseum.github.io/) | none | CC0 (Open Access) |
 | [Japan Search](https://jpsearch.go.jp/) (Tokyo Museum Collection and others) | jpsearch.go.jp/api | none | Public Domain Mark only; images ≈1000 px |
 | [National Gallery of Art, Washington](https://www.nga.gov/open-access-images.html) | [open data on GitHub](https://github.com/NationalGalleryOfArt/opendata) (no search API: a local index of ≈2900 paintings ships with the app, `packaging/nga_index.py`) | none | CC0 (open-access images) |
+| [Wikidata](https://www.wikidata.org/) + [Wikimedia Commons](https://commons.wikimedia.org/) — Latin America & Oceania | SPARQL at build time (`packaging/wikidata_index.py`); a local index ships with the app | none | Painters who died before 1925; only images Commons marks as public domain / CC0 |
 | [J. Paul Getty Museum](https://www.getty.edu/projects/open-content-program/) | [Linked Art + SPARQL](https://data.getty.edu/museum/collection/docs/) | none | Getty Open Content (CC0), only works the manifest marks as public domain, made before 1930 |
 | [Yale Center for British Art](https://britishart.yale.edu/) & [Yale University Art Gallery](https://artgallery.yale.edu/) | [LUX](https://lux.collections.yale.edu/) (Linked Art) + IIIF manifests | none | Only works marked "Copyright Statement: Public domain" |
 
-The **Region** filter (Europe, the Americas, East & South Asia, Middle East & Islamic world)
-works across museums; the Met adds Chinese & Japanese paintings, Japanese woodblock prints
+The **Region** filter (Europe, North America, Latin America, East & South Asia, Middle East & Islamic
+world, Oceania) works across museums, and you can combine regions; the Met adds Chinese & Japanese paintings, Japanese woodblock prints
 and Persian/Mughal manuscript paintings. Museums with little from a region are skipped.
 
 Planned: Europeana and Paris Musées (both need a free personal key, which would be entered in

@@ -85,9 +85,11 @@ SUBJECTS: dict[str, dict] = {
 
 REGIONS: dict[str, dict] = {
     "europe": {"label": "Europe"},
-    "americas": {"label": "The Americas"},
+    "americas": {"label": "North America"},
+    "latam": {"label": "Latin America"},
     "asia": {"label": "East & South Asia"},
     "middleeast": {"label": "Middle East & Islamic world"},
+    "oceania": {"label": "Oceania"},
 }
 
 PERIODS: dict[str, dict] = {
