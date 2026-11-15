@@ -597,6 +597,7 @@ async function init() {
   });
 
   search(true);
+  maybeStartTour(s);
 }
 
 init().catch((e) => setStatus(`Could not start: ${e.message}`));

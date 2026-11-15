@@ -80,8 +80,9 @@
     <section class="box" id="report">
       <h3>Help</h3>
       <div class="row">
-        <div class="what"><b>How Masterpiece works</b><span>A one-minute tour.</span></div>
-        <a class="button small" href="guide.html">Open the guide</a>
+        <div class="what"><b>How Masterpiece works</b><span>A short tour of the app, or the one-page guide.</span></div>
+        <span class="row-end"><button type="button" class="primary small" id="tourBtn">Take the tour</button>
+          <a class="button small" href="guide.html">Open the guide</a></span>
       </div>
       <div class="report">
         <div class="what"><b>Something not working?</b><span>Send a problem report to the maker. It opens a pre-filled page on GitHub
@@ -171,6 +172,10 @@
     }
 
     mountShell("settings");
+    $("tourBtn").addEventListener("click", () => {
+      try { sessionStorage.setItem("tour", "all"); } catch { /* fine */ }
+      location.href = "/";
+    });
     const syncTheme = () => {
       for (const b of $("themePick").querySelectorAll("button")) {
         b.classList.toggle("on", b.dataset.theme === themeChoice);

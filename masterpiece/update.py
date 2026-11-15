@@ -120,6 +120,8 @@ def note_start() -> dict | None:
     settings.save({"lastVersion": __version__})
     if not last or version_tuple(last) >= version_tuple(__version__):
         return None                                   # fresh install (or a downgrade): nothing to say
+    if not settings.load().get("tourVersion"):        # used Masterpiece before the tour existed:
+        settings.save({"tourVersion": last})          # the tour shows only what's new since then
     rel = cache.kv().get("update:installing", 1e12) or {}
     info = {"version": __version__, "from": last, "notes": "", "page": ""}
     if rel.get("version") == __version__:

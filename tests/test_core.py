@@ -464,6 +464,12 @@ def test_whats_new_after_an_update(monkeypatch):
     assert update.whats_new()["notes"] == "Lock screen!" and update.note_start() is None   # only once
     update.dismiss_whats_new()
     assert update.whats_new() is None and settings.load()["lastVersion"] == "0.4.0"
+    # someone who used the app before the tour existed sees only what's new since 0.3.0
+    assert settings.load()["tourVersion"] == "0.3.0"
+    settings.save({"tourVersion": "0.4.0"})                       # tour seen; a later update keeps it
+    monkeypatch.setattr(update, "__version__", "0.4.2")
+    update.note_start()
+    assert settings.load()["tourVersion"] == "0.4.0"
 
 
 def test_auto_update_only_when_on_installed_and_idle(monkeypatch):

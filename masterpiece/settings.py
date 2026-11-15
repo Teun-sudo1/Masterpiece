@@ -32,6 +32,7 @@ DEFAULTS: dict = {
     "interval": 60,               # minutes between paintings (slideshow / rotate), 1 … 44640
     "screens": "each",            # multi-monitor: "each" | "same" | "span"
     "introSeen": False,
+    "tourVersion": "",            # version whose tour was seen; after an update the tour shows only what's new
     "folder": "",                 # empty = default %USERPROFILE%\Pictures\Masterpiece
     "selection": [],              # list of Artwork dicts
     "banned": [],                 # "never show again": [{id, title, maker, museum}]

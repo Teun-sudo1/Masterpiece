@@ -488,6 +488,22 @@ dialog .prev { left: 8px; } dialog .next { right: 8px; }
   .progress span, dialog img, .card .thumb img, .now-item img { transition: none; }
 }
 
+/* ---------- guided tour */
+.tour-block { position: fixed; inset: 0; z-index: 40; }
+.tour-hole { position: fixed; z-index: 41; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgba(0,0,0,.62); transition: all .25s ease; }
+.tour-pop { position: fixed; z-index: 42; width: min(340px, calc(100vw - 24px)); padding: 16px 18px 14px;
+  border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line-2); box-shadow: 0 14px 40px rgba(0,0,0,.5);
+  transition: left .25s ease, top .25s ease; }
+.tour-pop h3 { margin: 4px 0 6px; font: italic 700 18px/1.25 var(--sans); }
+.tour-pop p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+.tour-kicker { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--accent); }
+.tour-kicker span { color: var(--muted); letter-spacing: 0; }
+.tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tour-actions > span { display: inline-flex; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .tour-hole, .tour-pop { transition: none; } }
+
 .toast {
   position: fixed; bottom: calc(var(--rotbar) + 72px); left: 50%; transform: translateX(-50%); z-index: 30;
   max-width: min(620px, 92vw); padding: 10px 16px; border-radius: var(--radius); font-size: 13px;
