@@ -100,7 +100,10 @@ class Handler(BaseHTTPRequestHandler):
                     s = settings.load()
                     folder = wallpaper.resolve_folder(s.get("folder"))
                     favs = set(s.get("favourites") or [])
-                    items = [{**i, "favourite": i["id"] in favs} for i in wallpaper.collection(folder)]
+                    from . import curator
+                    reasons = curator.picks()
+                    items = [{**i, "favourite": i["id"] in favs, "curator": (reasons.get(i["name"]) or {}).get("reason", "")}
+                             for i in wallpaper.collection(folder)]
                     return self._json({"folder": str(folder), "items": items,
                                        "banned": s.get("banned") or [],
                                        "timeOfDay": bool(s.get("timeOfDay")),
@@ -112,6 +115,8 @@ class Handler(BaseHTTPRequestHandler):
                                                    qs.get("name", ""), s.get("favourites") or [])
                     if not info:
                         return self._error(404, "This painting is no longer in your collection")
+                    from . import curator
+                    info["curator"] = curator.reason_for(info["name"])
                     return self._json(info)
                 if url.path == "/api/thumb":
                     folder = wallpaper.resolve_folder(settings.load().get("folder"))
@@ -132,11 +137,17 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(self._update_status())
                 if url.path == "/api/system":
                     return self._json(self._system_status())
+                if url.path == "/api/report":
+                    from . import report
+                    r = report.build()
+                    return self._json({**r, "repo": f"https://github.com/{report.UPDATE_REPO}"})
                 if url.path == "/api/search":
                     return self._search(qs)
                 if url.path == "/api/img":
                     return self._img(qs.get("u", ""))
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 return self._error(502, f"{type(e).__name__}: {e}")
             return self._error(404, "Not found")
         self._static(url.path)
@@ -229,6 +240,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._update(body)
             if path == "/api/system":
                 return self._system(body)
+            if path == "/api/report":                # the (edited) report -> GitHub "new issue" link
+                from . import report
+                title = str(body.get("title") or "Problem report")[:200]
+                text = report.anonymise(str(body.get("body") or ""))
+                return self._json({"url": report.issue_url(title, text)})
             if path == "/api/window":           # a second start of Masterpiece: show our window
                 app = getattr(self.server, "app", None)
                 if not app or not getattr(app, "win", None):
@@ -236,6 +252,8 @@ class Handler(BaseHTTPRequestHandler):
                 app.open_app(str(body.get("path") or ""))
                 return self._json({"ok": True})
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return self._error(500, f"{type(e).__name__}: {e}")
         self._error(404, "Not found")
 
@@ -364,7 +382,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _apply(self, body: dict):
         artworks = [Artwork.from_dict(d) for d in body.get("artworks") or []]
-        if not artworks:
+        if not artworks and body.get("mode") != "curator":     # the Curator can start from nothing
             return self._error(400, "Nothing selected")
         hosts = {urllib.parse.urlsplit(a.image_url).hostname for a in artworks}
         if not hosts <= sources.image_hosts():
@@ -383,6 +401,7 @@ class Handler(BaseHTTPRequestHandler):
             favourites=s.get("favourites") or [],
             time_of_day=bool(body.get("timeOfDay", s.get("timeOfDay"))),
             lock_screen=bool(s.get("lockScreen")),
+            seasons=bool(s.get("seasons")),
             set_now=bool(body.get("setNow", True)),
         )
         self._json(result)

@@ -730,3 +730,102 @@ def test_live_search(key):
     assert results, f"{key} returned nothing"
     a = results[0]
     assert a.source == key and a.width > 0 and a.image_url.startswith("https://")
+
+
+# ---------------------------------------------------------------- seasons, Curator, reports, Getty
+
+def test_seasons():
+    assert wallpaper.season_now(1) == "winter" and wallpaper.season_now(4) == "spring"
+    assert wallpaper.season_now(7) == "summer" and wallpaper.season_now(10) == "autumn"
+    assert wallpaper.season_weight("Skaters on a Frozen Canal", "winter") == 3.0
+    assert wallpaper.season_weight("A Summer Day at the Beach", "winter") == 0.3
+    assert wallpaper.season_weight("Portrait of a Lady", "winter") == 1.0
+    assert wallpaper.seasons_of("Orchard in bloom") == {"spring"}
+
+
+def test_cleanup_never_removes_favourites(tmp_path):
+    import time as _t
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    for i in range(5):
+        p = folder / f"aic-{i}.jpg"
+        p.write_bytes(b"x")
+        os.utime(p, (_t.time() - 1000 + i, _t.time() - 1000 + i))      # aic-0 is the oldest
+    removed = {p.name for p in wallpaper.cleanup(folder, 2, keep_ids=["aic-0"])}
+    assert removed == {"aic-1.jpg", "aic-2.jpg"} and (folder / "aic-0.jpg").exists()
+
+
+def test_curator_picks_new_paintings_with_reasons(tmp_path, monkeypatch):
+    import random
+    from masterpiece import cache, curator, settings
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    (folder / "aic-1.jpg").write_bytes(b"x")
+    cache.kv().set("art:aic-1.jpg", {"id": "aic-1", "title": "Haystacks", "maker": "Claude Monet", "museum": "X"})
+    settings.save({"folder": str(folder), "favourites": ["aic-1"], "enabledSources": ["aic", "nga"],
+                   "mode": "curator", "curatorDaily": 3, "banned": [{"id": "nga-9"}]})
+    monkeypatch.setattr(curator.monitors, "layout", lambda: {"monitors": [{"width": 1920, "height": 1080}], "span": None})
+    searches = []
+
+    def fake_search(keys, **kw):
+        searches.append((tuple(keys), kw["query"], kw["subject"]))
+        n = len(searches)
+        return {"results": [art(3000, 2000, id="aic-1").to_dict(),                      # already have it
+                            art(3000, 2000, id="nga-9").to_dict(),                      # hidden
+                            art(3000, 2000, id=f"nga-{100 + n}").to_dict()]}
+    monkeypatch.setattr(curator, "search_all", fake_search)
+    def fake_download(a, folder, **kw):
+        path = folder / f"{a.id}.jpg"
+        path.write_bytes(b"y")
+        return path
+    monkeypatch.setattr(curator.wallpaper, "download", fake_download)
+
+    added = curator.discover(rng=random.Random(4))
+    assert len(added) == 3 and all(a["id"].startswith("nga-1") for a in added)
+    assert all(a["reason"] for a in added) and len(searches) == 3
+    assert set(curator.picks()) == {a["name"] for a in added}
+    assert curator.due(settings.load())
+    assert curator.run_if_due() is not None and not curator.due(settings.load())   # once a day
+
+
+def test_curator_plan_uses_taste():
+    import random
+    from collections import Counter
+    from masterpiece import curator
+    plans = curator.plan({"seasons": True}, Counter({"Claude Monet": 5}), 40, random.Random(1))
+    reasons = " | ".join(p["reason"] for p in plans)
+    assert "Because you like Claude Monet" in reasons and "picked for you" in reasons
+    assert any(p.get("surprise") for p in plans) and (" for " in reasons)          # season plans
+
+
+def test_report_is_anonymous(monkeypatch):
+    from masterpiece import report
+    monkeypatch.setenv("USERNAME", "jandevries")
+    monkeypatch.setenv("COMPUTERNAME", "DESKTOP-JAN")
+    home = str(Path.home())
+    pic = os.path.join(home, "Pictures", "x.jpg")
+    text = report.anonymise(f"error in {pic} for jandevries (jan@example.com) on DESKTOP-JAN")
+    assert home not in text and "jandevries" not in text and "jan@example.com" not in text and "DESKTOP-JAN" not in text
+    url = report.issue_url("Problem", "**Last lines of the log**\n```\n" + "line\n" * 5000 + "```")
+    assert url.startswith("https://github.com/") and len(url) < 8000
+
+
+def test_getty_open_content_only():
+    from masterpiece.sources import getty
+    o = {"id": "https://data.getty.edu/museum/collection/object/abc", "_label": "Irises (90.PA.20)",
+         "identified_by": [{"type": "Name", "content": "Irises"}],
+         "produced_by": {"_label": "Production of Artwork by Vincent van Gogh",
+                         "timespan": {"identified_by": [{"content": "1889"}], "begin_of_the_begin": "1889-01-01"}},
+         "subject_of": [{"id": "https://www.getty.edu/art/collection/object/103JNH"}]}
+
+    def man(rights, stmt):
+        return {"rights": rights, "requiredStatement": {"value": {"en": [stmt]}},
+                "items": [{"width": 9000, "height": 7000, "items": [{"items": [{"body": {
+                    "service": [{"id": "https://media.getty.edu/iiif/image/xyz"}]}}]}]}]}
+    a = getty._to_artwork(o, man("http://creativecommons.org/publicdomain/zero/1.0/",
+                                 "Images provided here are believed to be in the public domain"))
+    assert a and a.title == "Irises" and a.maker == "Vincent van Gogh" and a.width == 3840
+    assert getty._to_artwork(o, man("http://rightsstatements.org/vocab/InC/1.0/", "")) is None
+    late = {**o, "produced_by": {**o["produced_by"], "timespan": {"begin_of_the_begin": "1955-01-01"}}}
+    assert getty._to_artwork(late, man("http://creativecommons.org/publicdomain/zero/1.0/", "public domain")) is None
+    assert '"' not in getty._escape('a "quoted" word') and "\n" not in getty._escape("x\ny")

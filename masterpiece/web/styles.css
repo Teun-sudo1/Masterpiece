@@ -262,6 +262,7 @@ main { padding: 20px 24px; }
 .update-actions button.primary { padding: 6px 14px; }
 .whats-new { align-items: flex-start; }
 .whats-new .notes { white-space: pre-line; margin-top: 6px; font-size: 14px; color: var(--text); max-height: 9.5em; overflow: auto; }
+.curator-note { color: var(--accent); font-size: 13px; }
 .settings-link { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; text-decoration: none; }
 .settings-link:hover { color: var(--text); }
 .settings-link svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }

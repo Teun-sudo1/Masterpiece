@@ -33,6 +33,9 @@ either as a rotating slideshow or as a single "painting of the day".
     Each screen gets a painting of matching shape, cropped to its exact resolution so the
     label stays visible. Runs as a per-user Windows scheduled task (`python -m masterpiece next`);
     stop it in the app or with `python -m masterpiece stop`.
+  - **Curator** — like the rotation, but every day the Curator also adds a few new paintings that
+    suit your taste: artists you saved or marked as favourite, your subject, the season, and now and
+    then a surprise. Each one says why it was chosen ("Because you like Claude Monet").
   - **Windows slideshow** — Masterpiece switches on Windows' own shuffled slideshow for the folder.
   - **Just once** — set the wallpaper now, no rotation.
 - A built-in "How it works" guide (shown on first start)
@@ -69,6 +72,11 @@ Click a painting for its info card with the museum's description (Chicago, Cleve
 - **Skip** (tray, collection, info card): removes the painting from your collection and puts
   another one on that screen; other screens keep theirs.
 - **Match time of day** (rotation only): brighter paintings by day, darker ones in the evening.
+- **Follow the seasons**: snow and ice in winter, blossom in spring, beaches in summer, harvest in autumn
+  come up more often.
+- **Something not working?** Settings (or the tray) builds a problem report — version, Windows, screens,
+  settings and the end of the log, with user name, e-mail addresses and folders removed — and opens it
+  as a pre-filled GitHub issue, or copies it.
 - Changing the label (on/off, style, position) updates the paintings on screen right away.
 - **Settings** page: screens, time of day, label, how many to keep, **lock screen** (the painting
   on the Windows lock screen too; your own picture comes back when you switch it off), start with
@@ -128,6 +136,7 @@ Settings are stored in `%APPDATA%\Masterpiece\settings.json` (never in the repo)
 | [The Metropolitan Museum of Art](https://www.metmuseum.org/hubs/open-access) | [collectionapi.metmuseum.org](https://metmuseum.github.io/) | none | CC0 (Open Access) |
 | [Japan Search](https://jpsearch.go.jp/) (Tokyo Museum Collection and others) | jpsearch.go.jp/api | none | Public Domain Mark only; images ≈1000 px |
 | [National Gallery of Art, Washington](https://www.nga.gov/open-access-images.html) | [open data on GitHub](https://github.com/NationalGalleryOfArt/opendata) (no search API: a local index of ≈2900 paintings ships with the app, `packaging/nga_index.py`) | none | CC0 (open-access images) |
+| [J. Paul Getty Museum](https://www.getty.edu/projects/open-content-program/) | [Linked Art + SPARQL](https://data.getty.edu/museum/collection/docs/) | none | Getty Open Content (CC0), only works the manifest marks as public domain, made before 1930 |
 | [Yale Center for British Art](https://britishart.yale.edu/) & [Yale University Art Gallery](https://artgallery.yale.edu/) | [LUX](https://lux.collections.yale.edu/) (Linked Art) + IIIF manifests | none | Only works marked "Copyright Statement: Public domain" |
 
 The **Region** filter (Europe, the Americas, East & South Asia, Middle East & Islamic world)

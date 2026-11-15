@@ -28,7 +28,7 @@ DEFAULTS: dict = {
     "labelStyle": {"look": "dark", "font": "sans", "size": "m", "text": "full"},
     "region": "",
     "maxFiles": 50,
-    "mode": "rotate",             # "slideshow" | "rotate" | "once"
+    "mode": "rotate",             # "slideshow" | "rotate" | "curator" | "once"
     "interval": 60,               # minutes between paintings (slideshow / rotate), 1 … 44640
     "screens": "each",            # multi-monitor: "each" | "same" | "span"
     "introSeen": False,
@@ -42,6 +42,8 @@ DEFAULTS: dict = {
     "autoUpdate": False,          # install updates by itself while the PC is idle
     "lastVersion": "",            # version seen at the previous start ("What's new" after an update)
     "lockScreen": False,          # also put the painting on the Windows lock screen
+    "seasons": False,             # winter scenes in winter, blossom in spring, …
+    "curatorDaily": 3,            # Curator mode: new paintings it adds per day
     "apiKeys": {},
 }
 

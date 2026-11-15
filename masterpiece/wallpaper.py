@@ -39,7 +39,7 @@ except ImportError:  # labels and exact-fit renders need Pillow
 
 # Files we manage look like "aic-12345.jpg"; anything else in the folder is left alone.
 OWN_FILE = re.compile(rf"^({'|'.join(map(re.escape, SOURCES))})-[\w-]+\.jpg$", re.I)
-MODES = ("slideshow", "rotate", "once")
+MODES = ("slideshow", "rotate", "curator", "once")
 
 
 def default_folder() -> Path:
@@ -361,10 +361,12 @@ def saved_ids(folder: Path) -> list[str]:
     return ids
 
 
-def cleanup(folder: Path, max_files: int) -> list[Path]:
-    """Delete our oldest files beyond max_files (and their originals)."""
+def cleanup(folder: Path, max_files: int, keep_ids=()) -> list[Path]:
+    """Delete our oldest files beyond max_files (and their originals). Favourites
+    (keep_ids) are never deleted and don't count towards the maximum."""
     removed = []
-    for p in own_files(folder)[max(0, max_files):]:
+    keep = fav_names(keep_ids)
+    for p in [p for p in own_files(folder) if p.name not in keep][max(0, max_files):]:
         try:
             p.unlink()
             removed.append(p)
@@ -499,6 +501,41 @@ def time_of_day_weights(paths: list[Path], part: str | None = None) -> dict:
     return out
 
 
+# Seasons (northern hemisphere): words in titles/descriptions, also Dutch/French/German
+SEASON_WORDS = {
+    "winter": r"winter|snow|snowy|ice|icy|skat\w*|frozen|frost\w*|sleigh|blizzard|hiver|neige|sneeuw|ijs|schnee|"
+              r"december|january|february",
+    "spring": r"spring ?time|springtime|blossom\w*|orchard in bloom|in bloom|cherry tree|tulips?|lente|printemps|"
+              r"fr[uü]hling|april|may ?day",
+    "summer": r"summer|beach|seaside|haymaking|hay ?stacks?|wheat ?field|bathing|picnic|zomer|[ée]t[ée]|sommer|"
+              r"june|july|august",
+    "autumn": r"autumn|fall foliage|harvest\w*|vintage|grape|herfst|automne|herbst|october|november|fallen leaves",
+}
+_SEASON_RE = {k: re.compile(rf"\b({v})\b", re.I) for k, v in SEASON_WORDS.items()}
+OPPOSITE = {"winter": "summer", "summer": "winter", "spring": "autumn", "autumn": "spring"}
+
+
+def season_now(month: int | None = None) -> str:
+    m = time.localtime().tm_mon if month is None else month
+    return {12: "winter", 1: "winter", 2: "winter", 3: "spring", 4: "spring", 5: "spring",
+            6: "summer", 7: "summer", 8: "summer"}.get(m, "autumn")
+
+
+def seasons_of(text: str) -> set[str]:
+    return {k for k, rx in _SEASON_RE.items() if rx.search(text or "")}
+
+
+def season_weight(text: str, now: str | None = None) -> float:
+    """×3 for a painting of this season, ×0.3 for one of the opposite season."""
+    now = now or season_now()
+    found = seasons_of(text)
+    if now in found:
+        return 3.0
+    if OPPOSITE[now] in found:
+        return 0.3
+    return 1.0
+
+
 def fav_names(favourites) -> set[str]:
     """Artwork IDs -> collection file names."""
     return {re.sub(r"[^\w-]+", "-", i) + ".jpg" for i in favourites or ()}
@@ -509,7 +546,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               pos: tuple[float, float] = DEFAULT_LABEL_POS,
               force: str | None = None, style: dict | None = None,
               favourites=None, time_of_day: bool = False,
-              keep: dict | None = None, lock_screen: bool = False) -> dict:
+              keep: dict | None = None, lock_screen: bool = False, seasons: bool = False) -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -524,9 +561,16 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
     prefer = set(prefer or [])
     favs = fav_names(favourites)
     tod = time_of_day_weights([sources[p][0] for p in files]) if time_of_day else {}
+    season = {}
+    if seasons:
+        now = season_now()
+        for p in files:
+            meta = cache.kv().get(_meta_key(p.name), 1e12) or {}
+            season[p] = season_weight(f"{meta.get('title', '')} {meta.get('text', '')}", now)
 
     def weight(p: Path) -> float:
-        return (FAVOURITE_WEIGHT if p.name in favs else 1.0) * tod.get(sources[p][0], 1.0)
+        return ((FAVOURITE_WEIGHT if p.name in favs else 1.0) * tod.get(sources[p][0], 1.0)
+                * season.get(p, 1.0))
 
     lay = monitors.layout()
     mons = lay["monitors"] or [{"id": None, "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True}]
@@ -657,7 +701,7 @@ def show_from_settings(s: dict | None = None, **kw) -> dict:
     return show_next(resolve_folder(s.get("folder")), s.get("screens", "each"), bool(s.get("label", True)),
                      pos=label_pos(s.get("labelPos")), style=label_style(s.get("labelStyle")),
                      favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")),
-                     lock_screen=bool(s.get("lockScreen")), **kw)
+                     lock_screen=bool(s.get("lockScreen")), seasons=bool(s.get("seasons")), **kw)
 
 
 def relabel_folder(folder: Path, label: bool, pos=DEFAULT_LABEL_POS, style: dict | None = None) -> int:
@@ -841,7 +885,8 @@ def open_background_settings() -> None:
 def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
           mode: str, screens: str = "each", interval: int = 60, set_now: bool = True,
           pos: tuple[float, float] = DEFAULT_LABEL_POS, style: dict | None = None,
-          favourites=None, time_of_day: bool = False, lock_screen: bool = False) -> dict:
+          favourites=None, time_of_day: bool = False, lock_screen: bool = False,
+          seasons: bool = False) -> dict:
     if mode == "daily":                    # settings from older versions
         mode, interval = "rotate", 1440
     interval = max(1, min(int(interval), 31 * 1440))
@@ -858,7 +903,7 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
             (ok if path else failed).append({"id": a.id, "title": a.title,
                                              "path": str(path) if path else None, "error": err})
 
-    removed = cleanup(folder, max_files)
+    removed = cleanup(folder, max_files, keep_ids=favourites or ())
     result = {
         "folder": str(folder),
         "downloaded": ok,
@@ -883,15 +928,20 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
             result["slideshow"] = False
             result["slideshowError"] = str(e)
             open_background_settings()
-    elif mode == "rotate":
+    elif mode in ("rotate", "curator"):
+        if mode == "curator":               # the Curator also chooses new paintings, once a day
+            from . import curator
+            added = curator.run_if_due(force=True) or []
+            result["curator"] = added
+            fresh += [a["name"] for a in added]
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
                                          favourites=favourites, time_of_day=time_of_day,
-                                         lock_screen=lock_screen)
+                                         lock_screen=lock_screen, seasons=seasons)
         schedule.enable(interval)
     else:
         schedule.disable()
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
-                                         favourites=favourites, lock_screen=lock_screen)
+                                         favourites=favourites, lock_screen=lock_screen, seasons=seasons)
     result["rotation"] = schedule.status()
     result["backup"] = backup.has_backup()
     return result

@@ -12,9 +12,9 @@ onto its API as well as it can and ignores what it can't support.
 To add a museum, create sources/<name>.py and add it to SOURCES below.
 """
 
-from . import aic, cleveland, jps, met, nga, rijks, smk, yale
+from . import aic, cleveland, getty, jps, met, nga, rijks, smk, yale
 
-SOURCES = {m.KEY: m for m in (aic, cleveland, jps, met, nga, rijks, smk, yale)}
+SOURCES = {m.KEY: m for m in (aic, cleveland, getty, jps, met, nga, rijks, smk, yale)}
 
 
 def describe() -> list[dict]:

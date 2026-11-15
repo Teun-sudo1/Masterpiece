@@ -20,6 +20,9 @@
     .card h3 a:hover { text-decoration: underline; }
     .now .pill { color: var(--text); text-decoration: none; }
     .now .pill:hover { background: var(--panel-2); }
+    .card .curated { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; font-size: 12px;
+      background: rgba(0,0,0,.6); border: 1px solid var(--accent); color: var(--accent); cursor: help; }
+    .card .curated.low { top: 40px; }
     .card .fav { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; padding: 0;
       display: grid; place-items: center; border-radius: 50%;
       background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); color: #fff; }
@@ -133,6 +136,7 @@
         el("a", { class: "thumb", href: infoUrl(it.name), title: "About this painting" },
           el("img", { src: `/api/thumb?name=${encodeURIComponent(it.name)}`, alt: it.title, loading: "lazy" })),
         ...(it.onScreen ? [el("span", { class: "onscreen" }, "On screen now")] : []),
+        ...(it.curator ? [el("span", { class: `curated${it.onScreen ? " low" : ""}`, title: it.curator }, "Curator's pick")] : []),
         heart(it),
         el("div", { class: "body" },
           el("h3", { title: it.title }, el("a", { href: infoUrl(it.name) }, it.title)),

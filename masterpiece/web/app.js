@@ -498,7 +498,9 @@ function toggle(a) {
 function renderTray() {
   const n = state.selected.size;
   $("selCount").textContent = `${n} selected`;
-  $("apply").disabled = n === 0;
+  const curator = $("mode").value === "curator";
+  $("apply").disabled = n === 0 && !curator;            // the Curator can start from nothing
+  $("apply").textContent = curator && n === 0 ? "Start the Curator" : "Set as wallpaper";
   $("showSel").textContent = state.showingSelection ? "back to results" : "show";
 }
 
@@ -618,13 +620,16 @@ function syncModeUi() {
   const once = $("mode").value === "once";
   $("intervalWrap").hidden = once;
   $("customWrap").hidden = once || $("interval").value !== "custom";
+  $("curatorNote").hidden = $("mode").value !== "curator";
+  renderTray();
 }
 
 // ------------------------------------------------------------------ apply / restore
 async function applySelection() {
   const btn = $("apply");
   btn.disabled = true;
-  btn.textContent = `Downloading ${state.selected.size}…`;
+  const curatorMode = $("mode").value === "curator";
+  btn.textContent = curatorMode ? "The Curator is choosing…" : `Downloading ${state.selected.size}…`;
   try {
     const r = await api("/api/apply", {
       artworks: [...state.selected.values()],
@@ -642,7 +647,13 @@ async function applySelection() {
         : `Couldn't switch on the slideshow automatically. In the Windows settings that opened, choose “Slideshow” and pick ${r.folder}.`;
     } else if (shown.length) {
       msg = `Now showing ${shown.map((t) => `“${t}”`).join(" and ")}.`;
-      if (r.mode === "rotate") msg += ` Next painting ${intervalText()}.`;
+      if (r.mode === "rotate" || r.mode === "curator") msg += ` Next painting ${intervalText()}.`;
+    }
+    if (r.mode === "curator") {
+      const c = r.curator || [];
+      msg = (c.length
+        ? `The Curator chose ${c.length} new painting${c.length === 1 ? "" : "s"} (${c.map((a) => `“${a.title}”: ${a.reason.toLowerCase()}`).join("; ")}). `
+        : "The Curator found nothing new right now and will look again tomorrow. ") + msg;
     }
     msg += ` (${r.downloaded.length} saved`;
     if (r.failed.length) msg += `, ${r.failed.length} failed`;
@@ -655,8 +666,7 @@ async function applySelection() {
   } catch (e) {
     toast(`Couldn't set the wallpaper: ${e.message}`, 10000);
   } finally {
-    btn.textContent = "Set as wallpaper";
-    btn.disabled = state.selected.size === 0;
+    renderTray();
   }
 }
 
@@ -930,7 +940,7 @@ async function init() {
   $("orientation").value = s.orientation || "screens";
   if ($("orientation").value === "span" && options.screens.length < 2) $("orientation").value = "screens";
   $("label").checked = !!s.label;
-  $("mode").value = ["slideshow", "rotate", "once"].includes(s.mode) ? s.mode : "rotate";
+  $("mode").value = ["slideshow", "rotate", "curator", "once"].includes(s.mode) ? s.mode : "rotate";
   setIntervalUi(s.interval || 60);
   api("/api/rotation").then((r) => renderRotation(r, r.backup)).catch(() => {});
   try { state.saved = new Set(await api("/api/saved")); } catch { /* badges are optional */ }

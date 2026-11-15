@@ -27,6 +27,7 @@
     .actions .fav.on { color: #ff6b81; border-color: #ff6b81; }
     .desc { white-space: pre-line; line-height: 1.6; margin: 0 0 18px; }
     .muted { color: var(--muted); font-size: 13px; }
+    .curator { margin: -6px 0 14px; color: var(--accent); font-size: 14px; }
     dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 16px; font-size: 14px; }
     dt { color: var(--muted); }
     dd { margin: 0; }
@@ -99,6 +100,7 @@
         el("div", {},
           el("h2", {}, p.title),
           el("p", { class: "who" }, [p.maker, p.year].filter(Boolean).join(", ")),
+          ...(p.curator ? [el("p", { class: "curator" }, el("b", {}, "Chosen by the Curator: "), p.curator)] : []),
           el("div", { class: "pills" },
             ...p.screens.map((s) => el("span", { class: "now" }, `On screen now · ${s}`)),
             ...(p.favourite ? [el("span", {}, "♥ Favourite")] : [])),

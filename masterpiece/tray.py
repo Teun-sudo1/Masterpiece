@@ -117,6 +117,21 @@ class Tray:
                 self.icon.notify(f"The update didn't work: {p['error']}"[:200], "Masterpiece")
         threading.Thread(target=watch, daemon=True).start()
 
+    def ask_curator(self, force: bool = True):
+        from . import curator
+        added = curator.run_if_due(force=force)
+        if added is None:
+            return
+        if not added:
+            if force:
+                self.icon.notify("The Curator found nothing new right now. Try again later.", "Curator")
+            return
+        shown = wallpaper.show_from_settings(prefer=[a["name"] for a in added])
+        first = added[0]
+        more = f" and {len(added) - 1} more" if len(added) > 1 else ""
+        self.icon.notify(f"“{first['title'][:60]}” by {first['maker'][:30]}{more}. {first['reason']}."[:240],
+                         "The Curator chose")
+
     def toggle_pause(self):
         if self.status().get("paused"):
             schedule.resume()
@@ -172,6 +187,8 @@ class Tray:
             MenuItem("Skip this painting", self._safe(lambda: self.skip()), visible=lambda item: count() == 1),
             MenuItem("Skip", Menu(self._skip_items), visible=lambda item: count() > 1),
             MenuItem("On screen now", Menu(self._on_screen)),
+            MenuItem("Ask the Curator now", self._safe(lambda: self.ask_curator(force=True)),
+                     visible=lambda item: settings.load().get("mode") == "curator"),
             Menu.SEPARATOR,
             MenuItem(lambda item: "Resume rotation" if self.status().get("paused") else "Pause rotation",
                      self._safe(self.toggle_pause), visible=lambda item: self.status().get("active", False)),
@@ -182,6 +199,7 @@ class Tray:
             MenuItem(lambda item: f"Install update {self._update['latest']}" if self._update else "Install update",
                      self._safe(self.install_update),
                      visible=lambda item: bool(self._update and self._update.get("available"))),
+            MenuItem("Report a problem…", self._safe(lambda: self.open_app("settings.html#report"))),
             MenuItem("Check for updates", self._safe(lambda: self.check_updates(force=True, quiet=False)),
                      visible=lambda item: bool(UPDATE_REPO)),
             MenuItem("Quit Masterpiece", lambda icon, item: self.quit()),
@@ -199,6 +217,8 @@ class Tray:
                     from . import update
                     if update.maybe_auto_install():          # only when switched on and the PC is idle
                         next_update_check = time.monotonic() + 3600
+                if settings.load().get("mode") == "curator":
+                    self.ask_curator(force=False)        # once a day, guarded in curator.py
                 self.refresh()
             except Exception:
                 pass

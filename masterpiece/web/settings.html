@@ -37,6 +37,10 @@
     table.usage .note { color: var(--muted); font-size: 12px; display: block; margin-left: 18px; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
     .muted { color: var(--muted); font-size: 13px; }
+    #report textarea { width: 100%; margin: 6px 0 4px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--text); font: 13px/1.45 var(--sans); resize: vertical; }
+    #repBody { font: 12px/1.45 Consolas, monospace !important; }
+    .rep-preview summary { cursor: pointer; margin-top: 6px; }
     .notes { white-space: pre-line; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
       padding: 10px 12px; margin: 10px 0 0; font-size: 14px; }
   </style>
@@ -68,13 +72,26 @@
         <label class="switch"><input type="checkbox" id="timeOfDay"><span></span></label>
       </div>
       <div class="row">
+        <div class="what"><b>Follow the seasons</b><span>Snow and ice in winter, blossom in spring, beaches in summer,
+          harvest in autumn come up more often. Masterpiece rotation only.</span></div>
+        <label class="switch"><input type="checkbox" id="seasons"><span></span></label>
+      </div>
+      <div class="row">
+        <div class="what"><b>Curator</b><span>With “Show as: Curator”, how many new paintings the Curator adds per day.
+          Favourites are always kept.</span></div>
+        <select id="curatorDaily">
+          <option value="1">1 a day</option><option value="2">2 a day</option>
+          <option value="3">3 a day</option><option value="5">5 a day</option>
+        </select>
+      </div>
+      <div class="row">
         <div class="what"><b>Label</b><span>Title, artist and museum on the painting.</span></div>
         <span><a href="/?label=1">Style &amp; position…</a> &nbsp;
           <label class="switch"><input type="checkbox" id="label"><span></span></label></span>
       </div>
       <div class="row">
-        <div class="what"><b>Keep at most</b><span>Older paintings are removed from your collection above this number
-          (favourites too).</span></div>
+        <div class="what"><b>Keep at most</b><span>Older paintings are removed from your collection above this number.
+          Favourites are always kept.</span></div>
         <input id="maxFiles" type="number" min="1" max="1000" step="1">
       </div>
       <div class="row">
@@ -120,6 +137,21 @@
         <button type="button" class="primary" id="freeBtn">Free up space</button>
         <button type="button" data-open="paintings">Open paintings folder</button>
         <button type="button" data-open="data">Open data folder</button>
+      </div>
+    </section>
+
+    <section class="box" id="report">
+      <h3>Something not working?</h3>
+      <p class="muted">Send a problem report to the maker of Masterpiece. It opens a pre-filled page on GitHub
+        (a free GitHub account is needed to submit), or copy it and send it any other way. Your user name,
+        e-mail addresses and folder names are removed; read it below before you send it.</p>
+      <label class="muted" for="repWhat">What happened?</label>
+      <textarea id="repWhat" rows="3" placeholder="E.g. I pressed “Next painting” and nothing changed."></textarea>
+      <details class="rep-preview"><summary class="muted">Show the report</summary>
+        <textarea id="repBody" rows="14" spellcheck="false"></textarea></details>
+      <div class="actions">
+        <button type="button" class="primary" id="repSend">Open on GitHub</button>
+        <button type="button" id="repCopy">Copy report</button>
       </div>
     </section>
 
@@ -201,6 +233,8 @@
       $("screensRow").hidden = sys.screens < 2;
       $("screens").value = s.screens || "each";
       $("timeOfDay").checked = !!s.timeOfDay;
+      $("seasons").checked = !!s.seasons;
+      $("curatorDaily").value = String([1, 2, 3, 5].includes(s.curatorDaily) ? s.curatorDaily : 3);
       $("label").checked = !!s.label;
       $("maxFiles").value = s.maxFiles || 50;
       $("lockScreen").checked = !!s.lockScreen;
@@ -211,6 +245,9 @@
 
     $("screens").addEventListener("change", () => save({ screens: $("screens").value }, "Saved. Used from the next painting on."));
     $("timeOfDay").addEventListener("change", () => save({ timeOfDay: $("timeOfDay").checked }, "Saved."));
+    $("curatorDaily").addEventListener("change", () => save({ curatorDaily: Number($("curatorDaily").value) }, "Saved."));
+    $("seasons").addEventListener("change", () => save({ seasons: $("seasons").checked },
+      $("seasons").checked ? "Paintings that suit the season now come up more often." : "Saved."));
     $("maxFiles").addEventListener("change", () =>
       save({ maxFiles: Math.max(1, Math.min(1000, Number($("maxFiles").value) || 50)) }, "Saved."));
     $("label").addEventListener("change", async () => {
@@ -251,6 +288,34 @@
       b.addEventListener("click", () => api("/api/system", { action: "openFolder", which: b.dataset.open })
         .catch((e) => toast(e.message)));
     }
+    // ---------------------------------------------------------------- problem report
+    let repTemplate = "";
+    const repText = () => {
+      const what = $("repWhat").value.trim() || "(please describe what you did and what went wrong)";
+      return $("repBody").dataset.edited ? $("repBody").value
+        : repTemplate.replace(/\*\*What happened\?\*\*\n[^\n]*/, `**What happened?**\n${what}`);
+    };
+    async function loadReport() {
+      try { const r = await api("/api/report"); repTemplate = r.body; $("repBody").value = repText(); }
+      catch (e) { $("repBody").value = `Couldn't build the report: ${e.message}`; }
+    }
+    $("repWhat").addEventListener("input", () => { if (!$("repBody").dataset.edited) $("repBody").value = repText(); });
+    $("repBody").addEventListener("input", () => { $("repBody").dataset.edited = "1"; });
+    $("repSend").addEventListener("click", async () => {
+      const what = $("repWhat").value.trim();
+      try {
+        const r = await api("/api/report", { title: `Problem: ${what.slice(0, 80) || "something went wrong"}`, body: repText() });
+        window.open(r.url, "_blank", "noopener");
+        toast("GitHub opens with the report filled in. Press “Submit new issue” there.", 8000);
+      } catch (e) { toast(`Didn't work: ${e.message}`); }
+    });
+    $("repCopy").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(repText()); toast("Report copied."); }
+      catch { $("repBody").closest("details").open = true; $("repBody").select(); toast("Select all and copy (Ctrl+C)."); }
+    });
+    loadReport();
+    if (location.hash === "#report") setTimeout(() => { $("report").scrollIntoView({ behavior: "smooth" }); $("repWhat").focus(); }, 300);
+
     load().catch((e) => toast(`Couldn't load the settings: ${e.message}`));
   </script>
 </body>

@@ -11,6 +11,15 @@ import urllib.request
 
 from . import __version__
 
+# Check HTTPS certificates the way Windows does (like a browser). Some museum servers
+# (e.g. the Getty) leave out an intermediate certificate; Windows fetches it, Python's
+# own check doesn't and fails. truststore makes Python use the Windows check.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:            # not installed / not supported: Python's own check
+    pass
+
 USER_AGENT = f"Masterpiece/{__version__} (open-source desktop wallpaper tool)"
 
 # The Art Institute of Chicago asks API users to identify themselves with
@@ -31,6 +40,8 @@ HOST_LIMITS = {   # host: (max simultaneous, min seconds between requests)
     "images.metmuseum.org": (2, 0.2),
     "lux.collections.yale.edu": (2, 0.1),          # a university service: go easy
     "manifests.collections.yale.edu": (2, 0.1),
+    "data.getty.edu": (2, 0.1),
+    "media.getty.edu": (2, 0.1),
 }
 _host_slots: dict[str, "_Slot"] = {}
 _host_lock = threading.Lock()

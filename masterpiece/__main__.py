@@ -34,6 +34,9 @@ def _quiet_streams() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     _quiet_streams()
+    from . import report
+    report.trim_log()
+    report.install_hooks()            # unexpected errors go to the log with their trace
     p = argparse.ArgumentParser(prog="masterpiece",
                                 description="Public-domain paintings as your Windows wallpaper")
     p.add_argument("--background", action="store_true", help="start in the tray without opening the window")
@@ -54,7 +57,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd in ("next", "daily"):
         s = settings.load()
         folder = wallpaper.resolve_folder(s.get("folder"))
-        chosen = wallpaper.show_from_settings(s)
+        prefer = []
+        if s.get("mode") == "curator":
+            from . import curator
+            try:
+                prefer = [a["name"] for a in curator.run_if_due(s) or []]
+            except Exception as e:                   # offline etc.: just rotate what we have
+                print(f"Curator: {e}", file=sys.stderr)
+        chosen = wallpaper.show_from_settings(s, prefer=prefer)
         if not chosen:
             print(f"No paintings in {folder}. Open Masterpiece first.", file=sys.stderr)
             return 1
