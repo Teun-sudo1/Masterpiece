@@ -107,18 +107,20 @@ const MAP_LAND = {
     [[120, 18], [122, 18], [126, 7], [124, 7], [121, 12]],
     [[80, 10], [82, 8], [81, 6], [80, 7]],
   ],
-  // not (yet) offered by any of the museums: drawn, but not clickable
-  off: [
+  africa: [
     [[-17, 21], [-10, 30], [-5, 36], [10, 37], [20, 32], [32, 31], [35, 28], [43, 12], [51, 12], [40, -3],
      [40, -15], [33, -26], [20, -35], [14, -22], [12, -5], [9, 4], [-8, 4], [-17, 14]],
     [[44, -12], [50, -15], [48, -25], [44, -22]],
+  ],
+  russia: [
     [[45, 60], [60, 68], [80, 73], [105, 77], [140, 72], [170, 70], [180, 66], [178, 62], [160, 60],
      [142, 59], [141, 53], [135, 48], [120, 50], [100, 50], [88, 48], [80, 45], [70, 40], [62, 36],
      [54, 37], [50, 38], [44, 40], [45, 48], [40, 50]],
   ],
+  off: [],      // land no source offers yet: drawn, but not clickable
 };
 const MAP_LABEL_AT = { americas: [-100, 45], latam: [-60, -12], europe: [14, 52], middleeast: [46, 28],
-                       asia: [104, 32], oceania: [134, -26] };
+                       asia: [104, 32], oceania: [134, -26], africa: [20, 5], russia: [100, 62] };
 const project = ([lon, lat]) => [((lon + 180) / 360) * 1000, ((80 - lat) / 138) * 420];
 const toPath = (ring) => "M" + ring.map((p) => project(p).map((v) => v.toFixed(1)).join(",")).join("L") + "Z";
 
@@ -142,7 +144,7 @@ function buildRegionMap() {
   map.append(offGroup);
 
   const labels = Object.fromEntries((state.options.regions || []).map((r) => [r.key, r.label]));
-  for (const key of ["americas", "latam", "europe", "middleeast", "asia", "oceania"]) {
+  for (const key of ["americas", "latam", "europe", "russia", "middleeast", "africa", "asia", "oceania"]) {
     const g = svgEl("g", { class: "region", "data-region": key, tabindex: "0", role: "button",
                            "aria-label": labels[key] || key });
     for (const ring of MAP_LAND[key]) g.append(svgEl("path", { class: "land", d: toPath(ring) }));
@@ -159,9 +161,7 @@ function buildRegionMap() {
     map.append(g);
   }
 
-  $("regionList").replaceChildren(
-    ...[{ key: "", label: "Everywhere" }, ...(state.options.regions || [])].map((r) =>
-      el("button", { type: "button", "data-region": r.key, onclick: () => toggleRegion(r.key) }, r.label)));
+  $("mapClear").onclick = () => toggleRegion("");
   syncRegionUi();
 }
 
@@ -170,9 +170,13 @@ function showMapTip(g, key) {
   const label = (state.options.regions.find((r) => r.key === key) || {}).label || key;
   const tip = $("mapTip"), wrap = $("worldMap").getBoundingClientRect(), b = g.getBoundingClientRect();
   tip.textContent = `${label} · ${n} museum${n === 1 ? "" : "s"}`;
-  tip.style.left = `${b.left - wrap.left + b.width / 2}px`;
-  tip.style.top = `${b.top - wrap.top + b.height / 2}px`;
   tip.hidden = false;
+  // keep the whole label inside the map
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  const x = Math.min(Math.max(b.left - wrap.left + b.width / 2 - tw / 2, 4), wrap.width - tw - 4);
+  const y = Math.min(Math.max(b.top - wrap.top + b.height / 2 - th - 6, 4), wrap.height - th - 4);
+  tip.style.left = `${x}px`;
+  tip.style.top = `${y}px`;
 }
 
 const regionValue = () => [...state.regions].sort().join(",");
@@ -193,9 +197,7 @@ function syncRegionUi() {
     g.classList.toggle("on", on.has(g.dataset.region));
     g.setAttribute("aria-pressed", String(on.has(g.dataset.region)));
   }
-  for (const b of document.querySelectorAll("#regionList button")) {
-    b.setAttribute("aria-pressed", String(b.dataset.region ? on.has(b.dataset.region) : on.size === 0));
-  }
+  $("mapClear").hidden = !on.size;
   const labels = (state.options.regions || []).filter((r) => on.has(r.key)).map((r) => r.label.split(" & ")[0]);
   $("regionSummary").textContent = !on.size ? "Everywhere" : on.size === 1 ? labels[0] : `${on.size} regions`;
 }
@@ -427,12 +429,7 @@ async function addSelection() {
   btn.textContent = `Adding ${arts.length}…`;
   try {
     const r = await api("/api/collection", { action: "add", artworks: arts });
-    const n = r.added.length;
-    let msg = `Added ${n} painting${n === 1 ? "" : "s"} to your collection.`;
-    msg += r.rotation && r.rotation.active ? " They come first in the rotation."
-      : " Start the rotation on the Curator tab to see them on your desktop.";
-    if (r.failed.length) msg += ` ${r.failed.length} couldn't be downloaded.`;
-    toast(msg, 8000);
+    if (r.failed.length) toast(`${r.failed.length} couldn't be downloaded.`, 8000);
     state.selected.clear();
     state.showingSelection = false;
     renderTray();

@@ -13,8 +13,11 @@ every day it adds a few new paintings that suit your taste.
 
 ## Four tabs
 
+A bar along the bottom of every tab shows whether the rotation runs, with ◀ previous, pause, ▶ next,
+**Restore my wallpaper**, and a switch between *Curator chooses* and *My collection*.
+
 **Search art** — search ten sources at once. The filter panel on the left (collapsible) has
-museums, a region map, subject, period, colour, highlights, shape ("fits my screens", "spans all
+museums, a clickable world map (choose one or more regions), subject, period, colour, highlights, shape ("fits my screens", "spans all
 my screens", portrait, panorama…), resolution ("sharp on my screens") and *hide* religious scenes /
 nudes / death & war. Click a painting for a large preview; select with **+** and press
 **Add to collection** in the bar that appears. New additions come first in the rotation.
@@ -26,8 +29,8 @@ that screen), *Remove* or *Never* (never show it in results again; undo under "H
 Click a painting for its info card with the museum's description or facts.
 
 **Curator** — the control centre for your desktop:
-- what's on each screen now, with ◀ previous, ▶ next, pause and **Restore my wallpaper**
-  (puts back exactly what you had before, including the lock screen);
+- what's on each screen now (**Restore my wallpaper** in the bottom bar puts back exactly what you
+  had before, including the lock screen);
 - *what to show*: **Curator chooses** (new paintings every day, plus your collection) or
   **My collection** only;
 - change every 10 minutes … once a day (or any interval), screens (a matching painting per screen,
@@ -38,7 +41,7 @@ Click a painting for its info card with the museum's description or facts.
   artists you like (from your collection and favourites), and how often you want to be surprised.
   Each pick says why it was chosen ("Because you like Claude Monet", "A winter scene for December").
 
-**Settings** — how many paintings to keep, start with Windows, updates (*install automatically*
+**Settings** — dark or light look (or as Windows), how many paintings to keep, start with Windows, updates (*install automatically*
 while you're away), storage (what takes how much space, *Free up space*), the guide, and a problem
 report (anonymised, opened as a pre-filled GitHub issue).
 
@@ -120,12 +123,12 @@ Settings are stored in `%APPDATA%\Masterpiece\settings.json` (never in the repo)
 | [The Metropolitan Museum of Art](https://www.metmuseum.org/hubs/open-access) | [collectionapi.metmuseum.org](https://metmuseum.github.io/) | none | CC0 (Open Access) |
 | [Japan Search](https://jpsearch.go.jp/) (Tokyo Museum Collection and others) | jpsearch.go.jp/api | none | Public Domain Mark only; images ≈1000 px |
 | [National Gallery of Art, Washington](https://www.nga.gov/open-access-images.html) | [open data on GitHub](https://github.com/NationalGalleryOfArt/opendata) (no search API: a local index of ≈2900 paintings ships with the app, `packaging/nga_index.py`) | none | CC0 (open-access images) |
-| [Wikidata](https://www.wikidata.org/) + [Wikimedia Commons](https://commons.wikimedia.org/) — Latin America & Oceania | SPARQL at build time (`packaging/wikidata_index.py`); a local index ships with the app | none | Painters who died before 1925; only images Commons marks as public domain / CC0 |
+| [Wikidata](https://www.wikidata.org/) + [Wikimedia Commons](https://commons.wikimedia.org/) — Latin America, Oceania, Africa & Russia | SPARQL at build time (`packaging/wikidata_index.py`); a local index ships with the app | none | Painters who died before 1925; only images Commons marks as public domain / CC0 |
 | [J. Paul Getty Museum](https://www.getty.edu/projects/open-content-program/) | [Linked Art + SPARQL](https://data.getty.edu/museum/collection/docs/) | none | Getty Open Content (CC0), only works the manifest marks as public domain, made before 1930 |
 | [Yale Center for British Art](https://britishart.yale.edu/) & [Yale University Art Gallery](https://artgallery.yale.edu/) | [LUX](https://lux.collections.yale.edu/) (Linked Art) + IIIF manifests | none | Only works marked "Copyright Statement: Public domain" |
 
-The **Region** filter (Europe, North America, Latin America, East & South Asia, Middle East & Islamic
-world, Oceania) works across museums, and you can combine regions; the Met adds Chinese & Japanese paintings, Japanese woodblock prints
+The **Region** filter (Europe, Russia, North America, Latin America, Africa, East & South Asia,
+Middle East & Islamic world, Oceania) works across museums, and you can combine regions; the Met adds Chinese & Japanese paintings, Japanese woodblock prints
 and Persian/Mughal manuscript paintings. Museums with little from a region are skipped.
 
 Planned: Europeana and Paris Musées (both need a free personal key, which would be entered in

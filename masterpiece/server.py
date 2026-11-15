@@ -262,7 +262,8 @@ class Handler(BaseHTTPRequestHandler):
                 "backup": backup.has_backup(), "mode": s.get("mode"), "interval": s.get("interval"),
                 "shown": wallpaper.shown_summary(),
                 "hasPrevious": len(cache.kv().get("rotation:history", 1e12) or []) > 1,
-                "curatorLatest": curator.latest(), "curatorLast": cache.kv().get("curator:last", 1e12) or ""}
+                "curatorLatest": curator.latest(), "curatorLast": cache.kv().get("curator:last", 1e12) or "",
+                "curatorBusy": bool(cache.kv().get("curator:running", curator.RUN_GUARD))}
 
     def _rotation(self, action: str | None, name: str | None = None, body: dict | None = None):
         s = settings.load()

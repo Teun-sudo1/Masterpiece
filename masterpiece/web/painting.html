@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>About this painting · Masterpiece</title>
+  <script>try{let t=localStorage.getItem("theme")||"dark";if(t==="system")t=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";document.documentElement.dataset.theme=t}catch(e){}</script>
   <link rel="stylesheet" href="styles.css">
   <style>
     body { padding: 0 0 40px; }
@@ -37,7 +38,7 @@
 </head>
 <body>
   <header class="appbar">
-    <a class="brand" href="/"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5"/><path d="M5 16.5l4.5-5 3.5 3.5 2.5-2.5 3.5 4"/><circle cx="15.5" cy="9" r="1.6"/></svg></span><span>Masterpiece</span></a>
+    <a class="brand" href="/"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect width="24" height="24" rx="3" fill="#15130f"/><rect x="2" y="2" width="20" height="20" rx="1.5" fill="#d4a24c"/><rect x="3" y="3" width="18" height="18" fill="#283a4a"/><rect x="3" y="12.5" width="18" height="8.5" fill="#3c4836"/><circle cx="14.9" cy="8.6" r="2.2" fill="#f3d792"/><path d="M3 15.8L8.6 9.6 13.9 15.8z" fill="#1c2421"/><path d="M9.6 15.8L15.8 11.5 21 15.8z" fill="#2e362c"/></svg></span><span>Masterpiece</span></a>
     <nav class="tabs" aria-label="Sections">
       <a href="/" class="tab" data-tab="search">Search art</a>
       <a href="collection.html" class="tab on" aria-current="page" data-tab="collection">My collection<span class="tab-count" id="collCount"></span></a>
@@ -52,12 +53,27 @@
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <footer class="rotbar" id="rotBar">
+    <div class="rot-left">
+      <span class="seg rot-mode" id="rotMode" role="radiogroup" aria-label="What to show">
+        <button type="button" role="radio" data-mode="curator" title="New paintings every day that suit your taste, plus your collection">Curator chooses</button>
+        <button type="button" role="radio" data-mode="rotate" title="Only the paintings you added yourself">My collection</button>
+      </span>
+      <div class="now-status" id="rotStatus"></div>
+    </div>
+    <div class="now-controls">
+      <button type="button" class="icon-btn" id="rotPrev" title="Previous painting"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button type="button" class="icon-btn" id="rotPause" title="Pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
+      <button type="button" class="icon-btn" id="rotNext" title="Next painting"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      <button type="button" class="primary small" id="rotStart" hidden>Start</button>
+      <button type="button" class="restore small" id="rotRestore" hidden title="Stop Masterpiece and put back the wallpaper you had before">Restore my wallpaper</button>
+    </div>
+  </footer>
   <script src="shell.js"></script>
   <script>
     "use strict";
     mountShell("collection");
     const name = new URLSearchParams(location.search).get("name") || "";
-    const shownText = (r) => Object.values(r.wallpapers || {}).map((t) => `“${t}”`).join(" and ");
 
     async function act(body, done) {
       try {
@@ -84,19 +100,12 @@
             ...(p.favourite ? [el("span", {}, "♥ Favourite")] : [])),
           el("div", { class: "actions" },
             el("button", { type: "button", class: "primary",
-              onclick: () => act({ action: "show", name: p.name }, (r) => { toast(`Now showing ${shownText(r)}.`); load(); }) },
+              onclick: () => act({ action: "show", name: p.name }, () => load()) },
               "Show now"),
             el("button", { type: "button", class: `fav${p.favourite ? " on" : ""}`,
-              onclick: () => act({ action: "favourite", name: p.name, on: !p.favourite }, () => {
-                toast(p.favourite ? "No longer a favourite." : "Favourite! It comes up about three times as often.");
-                load();
-              }) }, p.favourite ? "♥ Favourite" : "♡ Favourite"),
+              onclick: () => act({ action: "favourite", name: p.name, on: !p.favourite }, () => load()) }, p.favourite ? "♥ Favourite" : "♡ Favourite"),
             el("button", { type: "button", title: "Remove it from your collection and show another painting there",
-              onclick: () => act({ action: "skip", name: p.name }, (r) => {
-                const now = shownText(r);
-                toast(`Skipped and removed.${now ? ` Now showing ${now}.` : ""}`);
-                setTimeout(() => location.replace("collection.html"), 1500);
-              }) }, "Skip"),
+              onclick: () => act({ action: "skip", name: p.name }, () => location.replace("collection.html")) }, "Skip"),
             ...(p.link ? [el("a", { class: "button", href: p.link, target: "_blank", rel: "noopener" }, "Museum page ↗")] : [])),
           ...(d.description ? [el("p", { class: "desc" }, d.description)]
             : [el("p", { class: "muted" }, p.detailsError

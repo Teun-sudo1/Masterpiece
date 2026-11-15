@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from . import __version__
+from . import UPDATE_REPO, __version__
 
 # Check HTTPS certificates the way Windows does (like a browser). Some museum servers
 # (e.g. the Getty) leave out an intermediate certificate; Windows fetches it, Python's
@@ -20,7 +20,8 @@ try:
 except Exception:            # not installed / not supported: Python's own check
     pass
 
-USER_AGENT = f"Masterpiece/{__version__} (open-source desktop wallpaper tool)"
+# Wikimedia (and good manners) ask for a contact URL in the User-Agent
+USER_AGENT = f"Masterpiece/{__version__} (open-source desktop wallpaper tool; https://github.com/{UPDATE_REPO})"
 
 # The Art Institute of Chicago asks API users to identify themselves with
 # this header; its IIIF image server refuses anonymous clients without it.
@@ -42,6 +43,7 @@ HOST_LIMITS = {   # host: (max simultaneous, min seconds between requests)
     "manifests.collections.yale.edu": (2, 0.1),
     "data.getty.edu": (2, 0.1),
     "media.getty.edu": (2, 0.1),
+    "upload.wikimedia.org": (2, 0.1),
 }
 _host_slots: dict[str, "_Slot"] = {}
 _host_lock = threading.Lock()

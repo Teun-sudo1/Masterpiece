@@ -101,6 +101,8 @@ function mountShell(active) {
       el("div", { class: "progress", id: "updateBarProgress", hidden: true }, el("span", { id: "updateProgress" }))));
   bar.after(banners);
   setupUpdates();
+  setupRotBar();
+  api("/api/settings").then((s) => applyTheme(s.theme)).catch(() => {});
   api("/api/saved").then((ids) => setCollectionCount(ids.length)).catch(() => {});
 }
 
@@ -108,6 +110,89 @@ function setCollectionCount(n) {
   const c = $("collCount");
   if (c) c.textContent = n ? String(n) : "";
   try { sessionStorage.setItem("collCount", String(n || 0)); } catch { /* fine */ }
+}
+
+// ------------------------------------------------------------------ light / dark
+const lightQuery = matchMedia("(prefers-color-scheme: light)");
+let themeChoice = "dark";
+function applyTheme(choice) {
+  themeChoice = ["light", "system"].includes(choice) ? choice : "dark";
+  const t = themeChoice === "system" ? (lightQuery.matches ? "light" : "dark") : themeChoice;
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("theme", themeChoice); } catch { /* fine */ }
+}
+lightQuery.addEventListener("change", () => applyTheme(themeChoice));
+
+// ------------------------------------------------------------------ rotation bar (every page)
+let rotState = null, rotBusy = false;
+
+function intervalText(min) {
+  min = Number(min) || 60;
+  if (min % 1440 === 0) return min === 1440 ? "every day" : `every ${min / 1440} days`;
+  if (min % 60 === 0) return min === 60 ? "every hour" : `every ${min / 60} hours`;
+  return `every ${min} minutes`;
+}
+
+function shortTime(s) {
+  const m = String(s).match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+  if (!m) return s;
+  let h = Number(m[1]);
+  if (m[3]) h = (h % 12) + (/pm/i.test(m[3]) ? 12 : 0);
+  return `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
+function renderRotBar(r) {
+  if (!$("rotBar") || !r) return;
+  const active = !!r.active, paused = !!r.paused;
+  const status = !active ? (r.count ? "Not running" : "Your collection is still empty")
+    : paused ? "Paused" : `Changes ${intervalText(r.interval)}${r.nextRun ? ` · next at ${shortTime(r.nextRun)}` : ""}`;
+  $("rotStatus").replaceChildren(el("span", { class: `dot${active && !paused ? " on" : ""}` }), status);
+  for (const b of $("rotMode").querySelectorAll("button")) {
+    const on = b.dataset.mode === (r.mode === "curator" ? "curator" : "rotate");
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-checked", String(on));
+  }
+  $("rotStart").hidden = active;
+  $("rotStart").disabled = rotBusy;
+  $("rotPause").hidden = !active;
+  $("rotPause").replaceChildren(icon(paused ? "play" : "pause"));
+  $("rotPause").title = paused ? "Resume" : "Pause";
+  $("rotPrev").disabled = rotBusy || !r.hasPrevious;
+  $("rotNext").disabled = rotBusy || !r.count;
+  $("rotRestore").hidden = !(active || r.backup);
+}
+
+// every change to the rotation goes through here, so the bar and the page stay in step
+function setRotation(r) {
+  rotState = r;
+  renderRotBar(r);
+  try { sessionStorage.setItem("rotState", JSON.stringify(r)); } catch { /* fine */ }
+  document.dispatchEvent(new CustomEvent("rotation", { detail: r }));
+}
+
+async function rotAction(action, extra = {}) {
+  rotBusy = true;
+  renderRotBar(rotState);
+  try { const r = await api("/api/rotation", { action, ...extra }); rotBusy = false; setRotation(r); return r; }
+  catch (e) { toast(e.message); }
+  finally { rotBusy = false; renderRotBar(rotState); }
+}
+
+function setupRotBar() {
+  if (!$("rotBar")) return;
+  try { renderRotBar(JSON.parse(sessionStorage.getItem("rotState") || "null")); } catch { /* fine */ }
+  $("rotPrev").addEventListener("click", () => rotAction("previous"));
+  $("rotNext").addEventListener("click", () => rotAction("next"));
+  $("rotPause").addEventListener("click", () => rotAction(rotState && rotState.paused ? "resume" : "pause"));
+  $("rotStart").addEventListener("click", () => rotAction("start"));
+  $("rotRestore").addEventListener("click", () => rotAction("restore"));
+  $("rotMode").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-mode]");
+    if (b && !b.classList.contains("on")) rotAction("source", { mode: b.dataset.mode });
+  });
+  const poll = () => api("/api/rotation").then(setRotation).catch(() => {});
+  poll();
+  setInterval(poll, 60000);
 }
 
 // ------------------------------------------------------------------ updates

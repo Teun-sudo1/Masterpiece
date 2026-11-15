@@ -43,6 +43,7 @@ DEFAULTS: dict = {
     "lastVersion": "",            # version seen at the previous start ("What's new" after an update)
     "lockScreen": False,          # also put the painting on the Windows lock screen
     "seasons": False,             # winter scenes in winter, blossom in spring, …
+    "theme": "dark",              # the app's look: "dark" | "light" | "system" (as Windows)
     "curatorDaily": 3,            # Curator mode: new paintings it adds per day
     # Curator taste: 0 never · 1 less · 2 normal (default) · 3 more · 4 a lot
     "curatorTaste": {"subjects": {}, "periods": {}, "regions": {}, "museums": {}},

@@ -1,8 +1,8 @@
-"""Wikidata adapter: paintings from Latin America and Oceania (local index, no live queries).
+"""Wikidata adapter: paintings from Latin America, Oceania, Africa and Russia (local index, no live queries).
 
 Data:    packaging/wikidata_index.py asks Wikidata once for public-domain paintings in museums in
          Latin America, Australia and New Zealand, and by artists from those countries (painters
-         who died before 1925). It keeps only images that Wikimedia Commons marks as public
+         who died before 1925), and the same for Africa and Russia. It keeps only images that Wikimedia Commons marks as public
          domain / CC0, and writes masterpiece/data/wikidata.json.gz, which ships with the app.
 Images:  upload.wikimedia.org (original, or a Commons thumbnail in one of its standard widths).
 Regions: by the painter's nationality where known ("latam", "oceania", "europe", …), else where
@@ -21,12 +21,12 @@ from .. import content
 from ..models import Artwork, Results
 
 KEY = "wikidata"
-NAME = "Wikidata: Latin America & Oceania"
+NAME = "Wikidata & Wikimedia Commons"
 LICENSE = "Public domain (Wikimedia Commons)"
 HOMEPAGE = "https://www.wikidata.org/"
 SUPPORTS_COLOR = False
 IMAGE_HOSTS = ("upload.wikimedia.org",)
-REGIONS = {"latam", "oceania", "europe", "americas", "asia"}
+REGIONS = {"latam", "oceania", "africa", "russia", "europe", "americas", "asia", "middleeast"}
 
 INDEX = Path(__file__).resolve().parent.parent / "data" / "wikidata.json.gz"
 PAGE_SIZE = 60

@@ -90,6 +90,8 @@ REGIONS: dict[str, dict] = {
     "asia": {"label": "East & South Asia"},
     "middleeast": {"label": "Middle East & Islamic world"},
     "oceania": {"label": "Oceania"},
+    "africa": {"label": "Africa"},
+    "russia": {"label": "Russia"},
 }
 
 PERIODS: dict[str, dict] = {
