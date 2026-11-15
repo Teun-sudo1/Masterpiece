@@ -32,7 +32,9 @@ SEASON_SEARCH = {"winter": ("seasons", "", "A winter scene"), "spring": (None, "
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December"]
 SOURCES_PER_SEARCH = 3
-RUN_GUARD = 30 * 60              # don't start twice within 30 min (tray + rotation task)
+UNKNOWN = __import__("re").compile(r"unknown|anonym|ubekendt|onbekend|unbekannt|inconnu|sconosciuto|desconocido", 2)
+RUN_GUARD = 30 * 60
+TIME_BUDGET = 90                 # seconds: stop starting new searches after this (the rest comes next time)              # don't start twice within 30 min (tray + rotation task)
 
 
 def _today() -> str:
@@ -54,38 +56,69 @@ def taste(s: dict, folder: Path) -> Counter:
     makers: Counter = Counter()
     for item in wallpaper.collection(folder):
         m = (item.get("maker") or "").strip()
-        if not m or "unknown" in m.lower() or m.lower() in ("anonymous", "artist"):
+        if not m or UNKNOWN.search(m) or m.lower() == "artist":
             continue
         makers[m] += 3 if item["id"] in favs else 1
     return makers
 
 
+LEVEL_WEIGHT = [0.0, 0.4, 1.0, 2.5, 5.0]       # slider 0 never · 1 less · 2 normal · 3 more · 4 a lot
+SURPRISE_WEIGHT = [0.0, 1.0, 2.0, 4.0, 7.0]
+
+
+def _level(v) -> int:
+    try:
+        return max(0, min(4, int(v)))
+    except (TypeError, ValueError):
+        return 2
+
+
+def weights(s: dict, group: str, keys) -> dict:
+    """Slider weights for one group (subjects / periods / regions / museums)."""
+    taste = (s.get("curatorTaste") or {}).get(group) or {}
+    return {k: LEVEL_WEIGHT[_level(taste.get(k, 2))] for k in keys}
+
+
+def _pick(rng: random.Random, w: dict, only_if_personal: bool = False):
+    """Weighted choice. only_if_personal: None while every slider is still on "normal"."""
+    if only_if_personal and all(v == 1.0 for v in w.values()):
+        return None
+    keys = [k for k, v in w.items() if v > 0]
+    return rng.choices(keys, weights=[w[k] for k in keys])[0] if keys else None
+
+
 def plan(s: dict, makers: Counter, count: int, rng: random.Random) -> list[dict]:
-    """What to look for today: one search per new painting, varied."""
-    strategies = []
-    if makers:
-        strategies.append(("artist", 4))
-    strategies.append(("subject", 3))
+    """What to look for: one search per new painting, varied, following your sliders."""
+    muted = {m.lower() for m in s.get("curatorMutedArtists") or []}
+    top = [(m, n) for m, n in makers.most_common(12) if m.lower() not in muted][:8]
+    subj_w = weights(s, "subjects", content.SUBJECTS)
+    period_w = weights(s, "periods", content.PERIODS)
+    region_w = weights(s, "regions", content.REGIONS)
+    strategies = [("subject", 3.0)]
+    if top:
+        strategies.append(("artist", 4.0))
     if s.get("seasons"):
-        strategies.append(("season", 2))
-    strategies.append(("surprise", 2))
+        strategies.append(("season", 2.0))
+    surprise = SURPRISE_WEIGHT[_level(s.get("curatorSurprise", 2))]
+    if surprise:
+        strategies.append(("surprise", surprise))
     out = []
-    top = makers.most_common(8)
     for _ in range(count):
         kind = rng.choices([k for k, _ in strategies], weights=[w for _, w in strategies])[0]
+        p = {"query": "", "subject": None, "period": _pick(rng, period_w, True),
+             "region": _pick(rng, region_w, True)}
         if kind == "artist":
             maker = rng.choices([m for m, _ in top], weights=[n for _, n in top])[0]
-            out.append({"query": maker, "subject": None, "reason": f"Because you like {maker}"})
+            p.update(query=maker, period=None, region=None, reason=f"Because you like {maker}")
         elif kind == "subject":
-            subj = s.get("subject") if s.get("subject") in content.SUBJECTS else rng.choice(CALM_SUBJECTS)
-            label = content.SUBJECTS[subj]["label"]
-            out.append({"query": "", "subject": subj, "reason": f"{label}, picked for you"})
+            subj = _pick(rng, subj_w) or "landscape"
+            p.update(subject=subj, reason=f"{content.SUBJECTS[subj]['label']}, picked for you")
         elif kind == "season":
             subj, word, label = SEASON_SEARCH[wallpaper.season_now()]
-            out.append({"query": word, "subject": subj,
-                        "reason": f"{label} for {MONTHS[time.localtime().tm_mon - 1]}"})
+            p.update(query=word, subject=subj, reason=f"{label} for {MONTHS[time.localtime().tm_mon - 1]}")
         else:
-            out.append({"query": "", "subject": None, "surprise": True, "reason": "A surprise"})
+            p.update(surprise=True, period=None, region=None, reason="A surprise")
+        out.append(p)
     return out
 
 
@@ -94,6 +127,36 @@ def _targets(s: dict) -> tuple[str, list[tuple[int, int]]]:
     if s.get("screens") == "span" and lay.get("span") and len(lay["monitors"]) > 1:
         return "screens", [(lay["span"]["width"], lay["span"]["height"])]
     return "screens", [(m["width"], m["height"]) for m in lay["monitors"]] or [(1920, 1080)]
+
+
+def _never_filter(s: dict):
+    """Drop results that clearly belong to a subject or period you set to "never"."""
+    never_subj = [k for k, v in weights(s, "subjects", content.SUBJECTS).items() if v == 0]
+    words = [content.fold(w) for k in never_subj for w in [content.SUBJECTS[k]["keyword"], *content.SUBJECTS[k]["aic"]]]
+    never_periods = [content.PERIODS[k] for k, v in weights(s, "periods", content.PERIODS).items() if v == 0]
+    import re as _re
+
+    def ok(d: dict) -> bool:
+        title = content.fold(d.get("title") or "")
+        if any(_re.search(r"\b" + _re.escape(w) + r"\b", title) for w in words):
+            return False
+        m = _re.search(r"\d{4}", str(d.get("year") or ""))
+        if m and any(p["start"] <= int(m.group()) < p["end"] for p in never_periods):
+            return False
+        return True
+    return ok
+
+
+def _museums(s: dict, enabled: list[str], n: int, rng: random.Random) -> list[str]:
+    """Up to n museums, weighted by your museum sliders (never = left out)."""
+    w = weights(s, "museums", enabled)
+    pool = [k for k in enabled if w[k] > 0]
+    chosen = []
+    while pool and len(chosen) < n:
+        k = rng.choices(pool, weights=[w[x] for x in pool])[0]
+        chosen.append(k)
+        pool.remove(k)
+    return chosen
 
 
 def discover(s: dict | None = None, count: int | None = None, rng: random.Random | None = None) -> list[dict]:
@@ -109,23 +172,30 @@ def discover(s: dict | None = None, count: int | None = None, rng: random.Random
         return []
     orientation, targets = _targets(s)
     mw = str(s.get("minWidth") or "sharp")
+    hide = set(s.get("hide") or ())
+    if weights(s, "subjects", ["religious"])["religious"] == 0:
+        hide.add("religious")
     filters = dict(orientation=orientation, targets=targets, sharp=mw == "sharp",
-                   min_width=int(mw) if mw.isdigit() else 0, hide=tuple(s.get("hide") or ()),
-                   region=s.get("region") or None)
+                   min_width=int(mw) if mw.isdigit() else 0, hide=tuple(hide))
+    keep = _never_filter(s)
 
     added: list[dict] = []
     log = picks()
+    deadline = time.monotonic() + TIME_BUDGET
     for p in plan(s, taste(s, folder), count * 2, rng):    # spare searches for ones that find nothing new
-        if len(added) >= count:
+        if len(added) >= count or (added and time.monotonic() > deadline):
             break
-        keys = rng.sample(enabled, 1 if p.get("surprise") else min(SOURCES_PER_SEARCH, len(enabled)))
+        keys = _museums(s, enabled, 1 if p.get("surprise") else SOURCES_PER_SEARCH, rng)
+        if not keys:
+            break
         pages = (1, 6) if p.get("surprise") else (1, 2)
         try:
-            r = search_all(keys, cursors={k: rng.randint(*pages) for k in keys},
-                           query=p["query"], subject=p["subject"], **filters)
+            r = search_all(keys, cursors={k: rng.randint(*pages) for k in keys}, query=p["query"],
+                           subject=p["subject"], period=p.get("period"), region=p.get("region"),
+                           max_pages=1, **filters)          # one page per museum: modest and quick
         except Exception:
             continue
-        fresh = [d for d in r["results"] if d["id"] not in have and d["id"] not in hidden]
+        fresh = [d for d in r["results"] if d["id"] not in have and d["id"] not in hidden and keep(d)]
         if not fresh:
             continue
         d = rng.choice(fresh[:8])
@@ -138,14 +208,14 @@ def discover(s: dict | None = None, count: int | None = None, rng: random.Random
             continue
         reason = p["reason"]
         if p.get("surprise"):
-            reason = f"A surprise from the {art.museum}" if not art.museum.startswith("The ") else f"A surprise from {art.museum}"
+            reason = f"A surprise from {art.museum}" if art.museum.startswith("The ") else f"A surprise from the {art.museum}"
         have.add(art.id)
         log[path.name] = {"reason": reason, "date": _today()}
         added.append({"name": path.name, "id": art.id, "title": art.title, "maker": art.maker,
                       "museum": art.museum, "reason": reason})
-    # forget reasons of paintings that are gone
     names = {p.name for p in wallpaper.own_files(folder)}
     cache.kv().set("curator:picks", {k: v for k, v in log.items() if k in names})
+    wallpaper.queue_first([a["name"] for a in added])
     wallpaper.cleanup(folder, int(s.get("maxFiles") or 50), keep_ids=set(s.get("favourites") or []))
     return added
 

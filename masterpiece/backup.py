@@ -85,6 +85,7 @@ def _windows_default() -> str | None:
 def restore() -> dict:
     """Stop the rotation and bring back the wallpaper (and lock screen) from before Masterpiece."""
     schedule.disable()
+    cache.kv().set("current:shown", [])       # no Masterpiece painting on screen any more
     try:
         from . import lockscreen
         lockscreen.restore()

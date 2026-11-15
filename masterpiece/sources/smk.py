@@ -42,7 +42,8 @@ def _maker(production: list[dict]) -> str:
         return "Unknown artist"
     p = production[0]
     fn, sn = p.get("creator_forename"), p.get("creator_surname")
-    return f"{fn} {sn}" if fn and sn else (p.get("creator") or "Unknown artist")
+    name = f"{fn} {sn}" if fn and sn else (p.get("creator") or "")
+    return "Unknown artist" if not name or name.strip().lower() == "ubekendt" else name
 
 
 def _to_artwork(d: dict) -> Artwork | None:

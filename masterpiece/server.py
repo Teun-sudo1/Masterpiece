@@ -129,10 +129,7 @@ class Handler(BaseHTTPRequestHandler):
                     folder = wallpaper.resolve_folder(settings.load().get("folder"))
                     return self._json(wallpaper.saved_ids(folder))
                 if url.path == "/api/rotation":
-                    folder = wallpaper.resolve_folder(settings.load().get("folder"))
-                    return self._json({**schedule.status(), "folder": str(folder),
-                                       "count": len(wallpaper.own_files(folder)),
-                                       "backup": backup.has_backup()})
+                    return self._json(self._rotation_status())
                 if url.path == "/api/update":
                     return self._json(self._update_status())
                 if url.path == "/api/system":
@@ -233,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/apply":
                 return self._apply(body)
             if path == "/api/rotation":
-                return self._rotation(body.get("action"), body.get("name") or None)
+                return self._rotation(body.get("action"), body.get("name") or None, body)
             if path == "/api/collection":
                 return self._collection(body)
             if path == "/api/update":
@@ -257,22 +254,69 @@ class Handler(BaseHTTPRequestHandler):
             return self._error(500, f"{type(e).__name__}: {e}")
         self._error(404, "Not found")
 
-    def _rotation(self, action: str | None, name: str | None = None):
+    def _rotation_status(self) -> dict:
+        from . import curator
         s = settings.load()
+        folder = wallpaper.resolve_folder(s.get("folder"))
+        return {**schedule.status(), "folder": str(folder), "count": len(wallpaper.own_files(folder)),
+                "backup": backup.has_backup(), "mode": s.get("mode"), "interval": s.get("interval"),
+                "shown": wallpaper.shown_summary(),
+                "hasPrevious": len(cache.kv().get("rotation:history", 1e12) or []) > 1,
+                "curatorLatest": curator.latest(), "curatorLast": cache.kv().get("curator:last", 1e12) or ""}
+
+    def _rotation(self, action: str | None, name: str | None = None, body: dict | None = None):
+        s = settings.load()
+        body = body or {}
+        if action == "start":                    # start (or restart) the rotation
+            from . import curator
+            interval = max(1, min(31 * 1440, int(body.get("interval") or s.get("interval") or 60)))
+            settings.save({"interval": interval})
+            s = settings.load()
+            added = []
+            if s.get("mode") == "curator":
+                added = curator.run_if_due(s, force=not wallpaper.own_files(wallpaper.resolve_folder(s.get("folder")))) or []
+            shown = wallpaper.show_from_settings(s)
+            schedule.enable(interval)
+            return self._json({**self._rotation_status(), "wallpapers": shown, "curator": added})
+        if action == "interval":
+            interval = max(1, min(31 * 1440, int(body.get("interval") or 60)))
+            settings.save({"interval": interval})
+            if schedule.status().get("active"):
+                schedule.relink(interval)            # re-register with the new interval, keeps "paused"
+            return self._json(self._rotation_status())
+        if action == "source":                   # "curator" or "rotate" (my collection)
+            settings.save({"mode": "curator" if body.get("mode") == "curator" else "rotate"})
+            return self._json(self._rotation_status())
+        if action == "pause":
+            schedule.pause()
+            return self._json(self._rotation_status())
+        if action == "resume":
+            schedule.resume()
+            return self._json(self._rotation_status())
+        if action == "previous":
+            shown = wallpaper.show_previous(s)
+            if shown is None:
+                return self._error(400, "There is no earlier painting yet")
+            return self._json({**self._rotation_status(), "wallpapers": shown})
+        if action == "curator":                  # "Ask the Curator now"
+            from . import curator
+            added = curator.run_if_due(s, force=True) or []
+            shown = wallpaper.show_from_settings() if added else {}
+            return self._json({**self._rotation_status(), "curator": added, "wallpapers": shown})
         if action == "next":
             shown = wallpaper.show_from_settings(s)
-            return self._json({"wallpapers": shown, "rotation": schedule.status(),
-                               "backup": backup.has_backup()})
+            return self._json({**self._rotation_status(), "wallpapers": shown,
+                               "rotation": schedule.status()})
         if action == "refresh":                  # label changed: re-render what's on screen now
             return self._json(wallpaper.refresh_labels(s))
         if action == "skip":
             return self._json(wallpaper.skip(name, s))
         if action == "stop":
             schedule.disable()
-            return self._json({"rotation": schedule.status(), "backup": backup.has_backup()})
+            return self._json({**self._rotation_status(), "rotation": schedule.status()})
         if action == "restore":
             r = backup.restore()
-            return self._json({**r, "rotation": schedule.status(), "backup": backup.has_backup()})
+            return self._json({**self._rotation_status(), **r, "rotation": schedule.status()})
         self._error(400, "Unknown action")
 
     def _collection(self, body: dict):
@@ -280,6 +324,16 @@ class Handler(BaseHTTPRequestHandler):
         folder = wallpaper.resolve_folder(s.get("folder"))
         action, name = body.get("action"), str(body.get("name") or "")
         items = {i["name"]: i for i in wallpaper.collection(folder)}
+        if action == "add":                      # from Search art: download, show these first
+            arts = [Artwork.from_dict(d) for d in body.get("artworks") or []]
+            if not arts:
+                return self._error(400, "Nothing selected")
+            hosts = {urllib.parse.urlsplit(a.image_url).hostname for a in arts}
+            if not hosts <= sources.image_hosts():
+                return self._error(400, "Image host not allowed")
+            r = wallpaper.add_to_collection(arts, s)
+            settings.save({"selection": []})
+            return self._json({**r, "rotation": self._rotation_status()})
         if action == "show":
             if name not in items:
                 return self._error(404, "Not in your collection")

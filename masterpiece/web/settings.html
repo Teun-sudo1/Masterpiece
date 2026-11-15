@@ -5,107 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Settings · Masterpiece</title>
   <link rel="stylesheet" href="styles.css">
-  <style>
-    body { padding-bottom: 48px; }
-    .top.coll { grid-template-columns: 1fr; }
-    .settings { max-width: 860px; margin: 28px auto 0; padding: 0 24px; display: grid; gap: 18px; }
-    .settings h2 { margin: 0 0 4px; font: 600 26px/1.2 var(--serif); }
-    .settings a { color: var(--accent); }
-    section.box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
-    section.box h3 { margin: 0 0 12px; font: 600 18px/1.2 var(--serif); }
-    .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 18px; align-items: center;
-      padding: 10px 0; border-top: 1px solid var(--line); }
-    .row:first-of-type { border-top: 0; padding-top: 0; }
-    .row .what b { display: block; font-weight: 600; }
-    .row .what span { color: var(--muted); font-size: 13px; }
-    .row select, .row input[type=number] { min-width: 120px; }
-    .switch { position: relative; width: 44px; height: 24px; display: inline-block; }
-    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--panel-2);
-      border: 1px solid var(--line); transition: background .15s, border-color .15s; cursor: pointer; }
-    .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
-      border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
-    .switch input:checked + span { background: var(--accent); border-color: var(--accent); }
-    .switch input:checked + span::after { transform: translateX(20px); background: var(--accent-ink); }
-    .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .bar { height: 10px; border-radius: 999px; background: var(--panel-2); overflow: hidden; display: flex; margin: 4px 0 12px; }
-    .bar i { display: block; height: 100%; }
-    table.usage { width: 100%; border-collapse: collapse; font-size: 14px; }
-    table.usage td { padding: 6px 0; border-top: 1px solid var(--line); vertical-align: top; }
-    table.usage td.size { text-align: right; white-space: nowrap; padding-left: 16px; }
-    table.usage .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; }
-    table.usage .note { color: var(--muted); font-size: 12px; display: block; margin-left: 18px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-    .muted { color: var(--muted); font-size: 13px; }
-    #report textarea { width: 100%; margin: 6px 0 4px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
-      background: var(--panel-2); color: var(--text); font: 13px/1.45 var(--sans); resize: vertical; }
-    #repBody { font: 12px/1.45 Consolas, monospace !important; }
-    .rep-preview summary { cursor: pointer; margin-top: 6px; }
-    .notes { white-space: pre-line; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
-      padding: 10px 12px; margin: 10px 0 0; font-size: 14px; }
-  </style>
 </head>
 <body>
-  <header class="top coll">
-    <div class="brand">
-      <h1>Masterpiece</h1>
-      <p><a href="/">Paintings</a> · <a href="collection.html">My collection</a> · <a href="guide.html">How it works</a></p>
-    </div>
-  </header>
-
-  <main class="settings">
-    <h2>Settings</h2>
-
+  <main class="page settings">
     <section class="box">
-      <h3>Wallpaper</h3>
-      <div class="row" id="screensRow" hidden>
-        <div class="what"><b>Screens</b><span>What to show when you have more than one screen.</span></div>
-        <select id="screens">
-          <option value="each">Matching painting per screen</option>
-          <option value="same">Same painting on all</option>
-          <option value="span">One painting across all</option>
-        </select>
-      </div>
+      <h3>Collection</h3>
       <div class="row">
-        <div class="what"><b>Match time of day</b><span>Brighter paintings by day, darker ones in the evening.
-          Masterpiece rotation only.</span></div>
-        <label class="switch"><input type="checkbox" id="timeOfDay"><span></span></label>
-      </div>
-      <div class="row">
-        <div class="what"><b>Follow the seasons</b><span>Snow and ice in winter, blossom in spring, beaches in summer,
-          harvest in autumn come up more often. Masterpiece rotation only.</span></div>
-        <label class="switch"><input type="checkbox" id="seasons"><span></span></label>
-      </div>
-      <div class="row">
-        <div class="what"><b>Curator</b><span>With “Show as: Curator”, how many new paintings the Curator adds per day.
-          Favourites are always kept.</span></div>
-        <select id="curatorDaily">
-          <option value="1">1 a day</option><option value="2">2 a day</option>
-          <option value="3">3 a day</option><option value="5">5 a day</option>
-        </select>
-      </div>
-      <div class="row">
-        <div class="what"><b>Label</b><span>Title, artist and museum on the painting.</span></div>
-        <span><a href="/?label=1">Style &amp; position…</a> &nbsp;
-          <label class="switch"><input type="checkbox" id="label"><span></span></label></span>
-      </div>
-      <div class="row">
-        <div class="what"><b>Keep at most</b><span>Older paintings are removed from your collection above this number.
-          Favourites are always kept.</span></div>
-        <input id="maxFiles" type="number" min="1" max="1000" step="1">
-      </div>
-      <div class="row">
-        <div class="what"><b>Lock screen</b><span>Also show the painting on the Windows lock screen. Your own
-          lock-screen picture comes back when you switch this off or press “Restore my wallpaper”.</span></div>
-        <label class="switch"><input type="checkbox" id="lockScreen"><span></span></label>
+        <div class="what"><b>Keep at most</b><span>Older paintings are removed above this number. Favourites are always kept.</span></div>
+        <input id="maxFiles" type="number" min="1" max="1000" step="1" aria-label="Keep at most">
       </div>
     </section>
 
     <section class="box">
       <h3>Start-up</h3>
       <div class="row">
-        <div class="what"><b>Start with Windows</b><span>Puts the Masterpiece icon next to the clock when you sign in
-          (no window). The rotation runs either way.</span></div>
+        <div class="what"><b>Start with Windows</b><span>The Masterpiece icon appears next to the clock when you sign in. The rotation runs either way.</span></div>
         <label class="switch"><input type="checkbox" id="startup"><span></span></label>
       </div>
     </section>
@@ -114,17 +28,16 @@
       <h3>Updates</h3>
       <div class="row">
         <div class="what"><b id="verText">Version</b><span id="updText">Masterpiece checks for updates about once a day.</span></div>
-        <span class="actions" style="margin:0"><button type="button" id="checkBtn">Check now</button>
-          <button type="button" class="primary" id="installBtn" hidden>Install</button></span>
+        <span class="row-end"><button type="button" class="small" id="checkBtn">Check now</button>
+          <button type="button" class="primary small" id="installBtn" hidden>Install</button></span>
       </div>
       <div class="row">
-        <div class="what"><b>Install updates automatically</b><span>When an update is out, install it by itself
-          while you're away from the PC (15 minutes without mouse or keyboard).</span></div>
+        <div class="what"><b>Install updates automatically</b><span>While you're away from the PC (15 minutes without mouse or keyboard).</span></div>
         <label class="switch"><input type="checkbox" id="autoUpdate"><span></span></label>
       </div>
       <div id="whatsNewBox" hidden>
-        <p class="muted" id="whatsNewTitle"></p>
-        <div class="notes" id="whatsNewNotes"></div>
+        <p class="muted" id="whatsNewBoxTitle"></p>
+        <div class="notes" id="whatsNewBoxNotes"></div>
       </div>
     </section>
 
@@ -134,61 +47,42 @@
       <div class="bar" id="storBar"></div>
       <table class="usage"><tbody id="storTable"></tbody></table>
       <div class="actions">
-        <button type="button" class="primary" id="freeBtn">Free up space</button>
-        <button type="button" data-open="paintings">Open paintings folder</button>
-        <button type="button" data-open="data">Open data folder</button>
+        <button type="button" class="primary small" id="freeBtn">Free up space</button>
+        <button type="button" class="small" data-open="paintings">Open paintings folder</button>
+        <button type="button" class="small" data-open="data">Open data folder</button>
       </div>
     </section>
 
     <section class="box" id="report">
-      <h3>Something not working?</h3>
-      <p class="muted">Send a problem report to the maker of Masterpiece. It opens a pre-filled page on GitHub
-        (a free GitHub account is needed to submit), or copy it and send it any other way. Your user name,
-        e-mail addresses and folder names are removed; read it below before you send it.</p>
-      <label class="muted" for="repWhat">What happened?</label>
-      <textarea id="repWhat" rows="3" placeholder="E.g. I pressed “Next painting” and nothing changed."></textarea>
-      <details class="rep-preview"><summary class="muted">Show the report</summary>
-        <textarea id="repBody" rows="14" spellcheck="false"></textarea></details>
-      <div class="actions">
-        <button type="button" class="primary" id="repSend">Open on GitHub</button>
-        <button type="button" id="repCopy">Copy report</button>
+      <h3>Help</h3>
+      <div class="row">
+        <div class="what"><b>How Masterpiece works</b><span>A one-minute tour.</span></div>
+        <a class="button small" href="guide.html">Open the guide</a>
+      </div>
+      <div class="report">
+        <div class="what"><b>Something not working?</b><span>Send a problem report to the maker. It opens a pre-filled page on GitHub
+          (a free GitHub account is needed), or copy it and send it any other way. Your user name, e-mail addresses and folder
+          names are removed; read it before you send it.</span></div>
+        <textarea id="repWhat" rows="2" placeholder="What happened? E.g. I pressed “Next painting” and nothing changed." aria-label="What happened?"></textarea>
+        <details class="rep-preview"><summary class="muted">Show the report</summary>
+          <textarea id="repBody" rows="12" spellcheck="false" aria-label="Report"></textarea></details>
+        <div class="actions">
+          <button type="button" class="primary small" id="repSend">Open on GitHub</button>
+          <button type="button" class="small" id="repCopy">Copy report</button>
+        </div>
       </div>
     </section>
 
-    <p class="muted">Masterpiece is free and open source (MIT) ·
+    <p class="muted foot">Masterpiece is free and open source (MIT) ·
       <a href="https://github.com/Teun-sudo1/Masterpiece" target="_blank" rel="noopener">GitHub</a> ·
       Only public-domain works, from the museums' open-access collections.</p>
   </main>
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <script src="shell.js"></script>
   <script>
     "use strict";
-    const $ = (id) => document.getElementById(id);
-    async function api(path, body) {
-      const opts = body === undefined ? {} : {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      };
-      const r = await fetch(path, opts);
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-      return data;
-    }
-    function el(tag, attrs = {}, ...children) {
-      const n = document.createElement(tag);
-      for (const [k, v] of Object.entries(attrs)) {
-        if (k === "class") n.className = v;
-        else if (k === "style") n.style.cssText = v;
-        else n.setAttribute(k, v);
-      }
-      for (const c of children) n.append(c);
-      return n;
-    }
-    let toastTimer;
-    function toast(msg, ms = 5000) {
-      const t = $("toast"); t.textContent = msg; t.hidden = false;
-      clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), ms);
-    }
     const size = (b) => b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB`
       : b >= 1048576 ? `${(b / 1048576).toFixed(b >= 104857600 ? 0 : 1)} MB` : `${Math.round(b / 1024)} KB`;
     const COLORS = { collection: "#d4a24c", originals: "#8a6424", previews: "#5b7fa6", thumbs: "#3f5f80",
@@ -213,7 +107,7 @@
       $("freeBtn").textContent = st.freeable ? `Free up ${size(st.freeable)}` : "Free up space";
     }
 
-    function renderUpdate(u) {
+    function renderUpdateBox(u) {
       $("verText").textContent = `Version ${u.current}`;
       $("updText").textContent = u.available ? `Masterpiece ${u.latest} is available.`
         : u.error || (u.enabled ? "You have the newest version. Masterpiece checks about once a day." : "Update checks aren't set up in this copy.");
@@ -223,46 +117,22 @@
       const w = u.whatsNew;
       $("whatsNewBox").hidden = !(w && w.notes);
       if (w && w.notes) {
-        $("whatsNewTitle").textContent = `New in ${w.version}:`;
-        $("whatsNewNotes").textContent = w.notes;
+        $("whatsNewBoxTitle").textContent = `New in ${w.version}:`;
+        $("whatsNewBoxNotes").textContent = w.notes;
       }
     }
 
     async function load() {
       const [s, sys, u] = await Promise.all([api("/api/settings"), api("/api/system"), api("/api/update")]);
-      $("screensRow").hidden = sys.screens < 2;
-      $("screens").value = s.screens || "each";
-      $("timeOfDay").checked = !!s.timeOfDay;
-      $("seasons").checked = !!s.seasons;
-      $("curatorDaily").value = String([1, 2, 3, 5].includes(s.curatorDaily) ? s.curatorDaily : 3);
-      $("label").checked = !!s.label;
       $("maxFiles").value = s.maxFiles || 50;
-      $("lockScreen").checked = !!s.lockScreen;
       $("startup").checked = !!sys.startWithWindows;
       renderStorage(sys.storage);
-      renderUpdate(u);
+      renderUpdateBox(u);
     }
 
-    $("screens").addEventListener("change", () => save({ screens: $("screens").value }, "Saved. Used from the next painting on."));
-    $("timeOfDay").addEventListener("change", () => save({ timeOfDay: $("timeOfDay").checked }, "Saved."));
-    $("curatorDaily").addEventListener("change", () => save({ curatorDaily: Number($("curatorDaily").value) }, "Saved."));
-    $("seasons").addEventListener("change", () => save({ seasons: $("seasons").checked },
-      $("seasons").checked ? "Paintings that suit the season now come up more often." : "Saved."));
+    mountShell("settings");
     $("maxFiles").addEventListener("change", () =>
       save({ maxFiles: Math.max(1, Math.min(1000, Number($("maxFiles").value) || 50)) }, "Saved."));
-    $("label").addEventListener("change", async () => {
-      await save({ label: $("label").checked });
-      try { await api("/api/rotation", { action: "refresh" }); toast("Label updated on your desktop."); } catch { /* fine */ }
-    });
-    $("lockScreen").addEventListener("change", async (e) => {
-      e.target.disabled = true;
-      try {
-        await api("/api/system", { action: "lockScreen", on: e.target.checked });
-        toast(e.target.checked ? "The painting is on your lock screen too (press Win+L to see it)."
-          : "Your own lock-screen picture is back.");
-      } catch (err) { toast(`Didn't work: ${err.message}`); e.target.checked = !e.target.checked; }
-      e.target.disabled = false;
-    });
     $("startup").addEventListener("change", async (e) => {
       try { await api("/api/system", { action: "startup", on: e.target.checked });
         toast(e.target.checked ? "Masterpiece starts with Windows." : "Masterpiece no longer starts with Windows."); }
@@ -271,12 +141,13 @@
     $("autoUpdate").addEventListener("change", (e) => save({ autoUpdate: e.target.checked },
       e.target.checked ? "Updates will install by themselves while you're away." : "You'll be asked before each update."));
     $("checkBtn").addEventListener("click", async () => {
-      try { const u = await api("/api/update", { action: "check" }); renderUpdate(u);
+      try { const u = await api("/api/update", { action: "check" }); renderUpdateBox(u); renderUpdate(u);
         if (!u.available) toast(u.error || `You have the newest version (${u.current}).`); }
       catch (e) { toast(`Couldn't check: ${e.message}`); }
     });
     $("installBtn").addEventListener("click", async () => {
-      try { await api("/api/update", { action: "install" }); toast("Downloading the update. Masterpiece restarts by itself.", 10000); }
+      try { renderUpdate(await api("/api/update", { action: "install" }));
+        toast("Downloading the update. Masterpiece restarts by itself.", 10000); }
       catch (e) { toast(`Couldn't start the update: ${e.message}`); }
     });
     $("freeBtn").addEventListener("click", async () => {
@@ -288,6 +159,7 @@
       b.addEventListener("click", () => api("/api/system", { action: "openFolder", which: b.dataset.open })
         .catch((e) => toast(e.message)));
     }
+
     // ---------------------------------------------------------------- problem report
     let repTemplate = "";
     const repText = () => {

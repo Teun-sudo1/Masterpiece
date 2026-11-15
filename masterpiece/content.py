@@ -130,7 +130,7 @@ def hidden(text: str, hide: list[str] | tuple[str, ...]) -> bool:
 
 def describe() -> dict:
     return {
-        "subjects": [{"key": k, "label": v["label"]} for k, v in SUBJECTS.items()],
+        "subjects": [{"key": k, "label": v["label"], "terms": [v["keyword"], *v["aic"]]} for k, v in SUBJECTS.items()],
         "regions": [{"key": k, "label": v["label"]} for k, v in REGIONS.items()],
         "periods": [{"key": k, "label": v["label"]} for k, v in PERIODS.items()],
         "hide": [{"key": k, "label": v["label"]} for k, v in HIDE.items()],

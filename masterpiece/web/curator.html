@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Curator · Masterpiece</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page curator">
+    <!-- What's on your desktop -->
+    <section class="now-card" id="nowCard">
+      <div class="now-items" id="nowItems"></div>
+      <div class="now-bar">
+        <div class="now-status" id="nowStatus"></div>
+        <div class="now-controls">
+          <button type="button" class="icon-btn" id="prevBtn" title="Previous painting"></button>
+          <button type="button" class="icon-btn" id="pauseBtn" title="Pause"></button>
+          <button type="button" class="icon-btn" id="nextBtn" title="Next painting"></button>
+          <button type="button" class="primary" id="startBtn" hidden>Start</button>
+          <button type="button" class="restore small" id="restoreBtn" title="Stop Masterpiece and put back the wallpaper you had before">Restore my wallpaper</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="curator-cols">
+      <!-- How it changes -->
+      <section class="box">
+        <h3>What to show</h3>
+        <div class="source-pick" id="sourcePick" role="radiogroup" aria-label="What to show">
+          <button type="button" role="radio" data-mode="curator">
+            <b>Curator chooses</b><span>New paintings every day that suit your taste, plus your collection.</span></button>
+          <button type="button" role="radio" data-mode="rotate">
+            <b>My collection</b><span>Only the paintings you added yourself.</span></button>
+        </div>
+
+        <div class="row">
+          <div class="what"><b>Change every</b></div>
+          <span class="interval">
+            <select id="interval" aria-label="Change every">
+              <option value="10">10 minutes</option><option value="30">30 minutes</option>
+              <option value="60">hour</option><option value="180">3 hours</option>
+              <option value="1440">day</option><option value="custom">custom…</option>
+            </select>
+            <span id="customWrap" class="custom-interval" hidden>
+              <input id="customN" type="number" min="1" max="999" step="1" value="2" aria-label="Interval">
+              <select id="customUnit" aria-label="Unit"><option value="1">minutes</option>
+                <option value="60">hours</option><option value="1440">days</option></select>
+            </span>
+          </span>
+        </div>
+        <div class="row" id="screensRow" hidden>
+          <div class="what"><b>Screens</b></div>
+          <select id="screens">
+            <option value="each">A matching painting per screen</option>
+            <option value="same">The same painting on all</option>
+            <option value="span">One painting across all</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="what"><b>Label</b><span>Title, artist and museum on the painting.</span></div>
+          <span class="row-end"><button type="button" class="link" id="labelBtn">Style &amp; position…</button>
+            <label class="switch"><input type="checkbox" id="label"><span></span></label></span>
+        </div>
+        <div class="row">
+          <div class="what"><b>Match time of day</b><span>Brighter by day, darker in the evening.</span></div>
+          <label class="switch"><input type="checkbox" id="timeOfDay"><span></span></label>
+        </div>
+        <div class="row">
+          <div class="what"><b>Follow the seasons</b><span>Snow in winter, blossom in spring…</span></div>
+          <label class="switch"><input type="checkbox" id="seasons"><span></span></label>
+        </div>
+        <div class="row">
+          <div class="what"><b>Lock screen too</b><span>Your own lock screen comes back when you switch this off.</span></div>
+          <label class="switch"><input type="checkbox" id="lockScreen"><span></span></label>
+        </div>
+      </section>
+
+      <!-- Your taste -->
+      <section class="box taste" id="tasteBox">
+        <div class="taste-head">
+          <h3>Your taste</h3>
+          <button type="button" class="small" id="askBtn">Ask the Curator now</button>
+        </div>
+        <p class="muted" id="tasteNote">The Curator looks for paintings like these. Slide to “never” to leave something out.</p>
+        <div class="taste-tabs seg" id="tasteTabs" role="tablist">
+          <button type="button" data-group="subjects" class="on">Subjects</button>
+          <button type="button" data-group="periods">Periods</button>
+          <button type="button" data-group="regions">Regions</button>
+          <button type="button" data-group="museums">Museums</button>
+        </div>
+        <div class="sliders" id="sliders"></div>
+
+        <div class="taste-extra">
+          <div class="what"><b>Artists you like</b><span>From your collection and favourites. Click to leave one out.</span></div>
+          <div class="chips artists" id="artists"></div>
+        </div>
+        <div class="slider-row surprise-row">
+          <span class="s-label">Surprise me</span>
+          <input type="range" min="0" max="4" step="1" id="surprise" aria-label="Surprise me">
+          <span class="s-val" id="surpriseVal"></span>
+        </div>
+        <div class="row">
+          <div class="what"><b>New paintings per day</b></div>
+          <select id="curatorDaily"><option value="1">1</option><option value="2">2</option>
+            <option value="3">3</option><option value="5">5</option></select>
+        </div>
+      </section>
+    </div>
+
+    <section class="box" id="recentBox" hidden>
+      <h3>Recently chosen by the Curator</h3>
+      <div class="recent" id="recent"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="shell.js"></script>
+  <script src="label.js"></script>
+  <script src="curator.js"></script>
+</body>
+</html>

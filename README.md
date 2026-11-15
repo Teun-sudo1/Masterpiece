@@ -2,47 +2,51 @@
 
 **Public-domain paintings as your Windows wallpaper**
 
-Masterpiece searches the open-access collections of several museums at once, lets you
-pick the paintings you like, and turns them into your Windows desktop background —
-either as a rotating slideshow or as a single "painting of the day".
+Masterpiece searches the open-access collections of great museums, fits the paintings to
+each of your screens, and changes them as often as you like. Or let the **Curator** choose:
+every day it adds a few new paintings that suit your taste.
 
 ![Masterpiece screenshot](docs/screenshot.png)
 
 > **Not an official app.** Masterpiece is an independent open-source project. It is not
 > made, endorsed or supported by any of the museums whose public APIs it uses.
 
-## Features
+## Four tabs
 
-- Search several museums in parallel, with an on/off toggle per museum
-- Content filters: subject (landscapes, sea, cities, flowers, portraits, …), period,
-  dominant colour, and *hide* religious scenes / nudes / death & war
-- Screen-aware filters: "fits my screens" (also portrait monitors), "spans all my
-  screens", "sharp on my screens" (no upscaling), or a fixed minimum width
-- Multi-monitor: a matching painting per screen, the same one everywhere, or one
-  painting spanned across all screens
-- Preview paintings full-size before you select them
-- Downloads your selection to `%USERPROFILE%\Pictures\Masterpiece`
-- Optional label *title — artist · museum*, bottom-centre by default; drag it anywhere on a
-  preview of your screens. Styles: dark or light box, museum plaque, text with shadow, subtle;
-  sans or serif; three sizes; full text, two lines (title, then artist, year · museum), or less
-- **Restore my wallpaper**: Masterpiece remembers what you had before (per-screen pictures,
-  fit, colour or Windows slideshow) and puts it back; `python -m masterpiece stop` does the same
-- Keeps the folder tidy: oldest files are removed above a maximum you choose
-- Three ways to show them:
-  - **Masterpiece rotation** (recommended) — a new painting every 10 min … once a day.
-    Each screen gets a painting of matching shape, cropped to its exact resolution so the
-    label stays visible. Runs as a per-user Windows scheduled task (`python -m masterpiece next`);
-    stop it in the app or with `python -m masterpiece stop`.
-  - **Curator** — like the rotation, but every day the Curator also adds a few new paintings that
-    suit your taste: artists you saved or marked as favourite, your subject, the season, and now and
-    then a surprise. Each one says why it was chosen ("Because you like Claude Monet").
-  - **Windows slideshow** — Masterpiece switches on Windows' own shuffled slideshow for the folder.
-  - **Just once** — set the wallpaper now, no rotation.
-- A built-in "How it works" guide (shown on first start)
-- Gentle on the museums' servers: search pages are cached for 6 hours, images and object
-  data on disk, at most 4 simultaneous requests per museum, nothing is downloaded twice
+**Search art** — search nine museums at once. The filter panel on the left (collapsible) has
+museums, a region map, subject, period, colour, highlights, shape ("fits my screens", "spans all
+my screens", portrait, panorama…), resolution ("sharp on my screens") and *hide* religious scenes /
+nudes / death & war. Click a painting for a large preview; select with **+** and press
+**Add to collection** in the bar that appears. New additions come first in the rotation.
 
-Only public-domain / open-access works are shown.
+**My collection** — your paintings, with their own filters (favourites, the Curator's picks, on
+screen now, subject, period, shape, museum) and ordering. **♥ Favourite** paintings come up about
+three times as often and are never cleaned up. *Show now*, *Skip* (remove it and show another on
+that screen), *Remove* or *Never* (never show it in results again; undo under "Hidden paintings").
+Click a painting for its info card with the museum's description or facts.
+
+**Curator** — the control centre for your desktop:
+- what's on each screen now, with ◀ previous, ▶ next, pause and **Restore my wallpaper**
+  (puts back exactly what you had before, including the lock screen);
+- *what to show*: **Curator chooses** (new paintings every day, plus your collection) or
+  **My collection** only;
+- change every 10 minutes … once a day (or any interval), screens (a matching painting per screen,
+  the same on all, or one spanned across all), the **label** (dark/light box, museum plaque, shadow,
+  subtle; sans or serif; three sizes; drag it anywhere on a preview of your screens), *match time of
+  day*, *follow the seasons*, and the **lock screen**;
+- **your taste**: sliders from *never* to *a lot* for subjects, periods, regions and museums, the
+  artists you like (from your collection and favourites), and how often you want to be surprised.
+  Each pick says why it was chosen ("Because you like Claude Monet", "A winter scene for December").
+
+**Settings** — how many paintings to keep, start with Windows, updates (*install automatically*
+while you're away), storage (what takes how much space, *Free up space*), the guide, and a problem
+report (anonymised, opened as a pre-filled GitHub issue).
+
+The rotation runs as a per-user Windows scheduled task (`Masterpiece.exe next`), so it keeps going
+when the app is closed. Each screen gets a painting of matching shape, rendered at its exact
+resolution so the label stays sharp and visible. Only public-domain / open-access works are shown,
+and Masterpiece is gentle on the museums' servers: search pages are cached for 6 hours, images and
+object data on disk, a few requests per museum at a time, nothing is downloaded twice.
 
 ## Install & run
 
@@ -60,37 +64,17 @@ python -m masterpiece          # opens http://127.0.0.1:8765 and a tray icon
 
 After `install`, just double-click **Masterpiece**. It opens in its own app window (Edge
 WebView2, built into Windows 11; without it Masterpiece uses your browser) and puts an icon next to
-the clock. Closing the window keeps Masterpiece running in the tray. Tray menu: *Next painting*, *On screen now* (opens the museum page), *Pause rotation*,
-*Restore my wallpaper*, *Start with Windows* and *Quit*. Starting it again while it runs
+the clock. Closing the window keeps Masterpiece running in the tray. Tray menu: *Next painting*, *Skip*,
+*On screen now* (info card, favourite, skip, museum page), *Ask the Curator now*, *Pause rotation*,
+*Restore my wallpaper*, *Start with Windows*, *Report a problem* and *Quit*. Starting it again while it runs
 simply opens the app.
-
-**My collection** (link at the top) shows the paintings you've saved, which ones are on screen
-now, and lets you *show now*, *remove* or *never show again* (undo under "Hidden paintings").
-Click a painting for its info card with the museum's description (Chicago, Cleveland) or facts (the Met).
-
-- **♥ Favourite**: favourites come up about three times as often in the rotation.
-- **Skip** (tray, collection, info card): removes the painting from your collection and puts
-  another one on that screen; other screens keep theirs.
-- **Match time of day** (rotation only): brighter paintings by day, darker ones in the evening.
-- **Follow the seasons**: snow and ice in winter, blossom in spring, beaches in summer, harvest in autumn
-  come up more often.
-- **Something not working?** Settings (or the tray) builds a problem report — version, Windows, screens,
-  settings and the end of the log, with user name, e-mail addresses and folders removed — and opens it
-  as a pre-filled GitHub issue, or copies it.
-- Changing the label (on/off, style, position) updates the paintings on screen right away.
-- **Settings** page: screens, time of day, label, how many to keep, **lock screen** (the painting
-  on the Windows lock screen too; your own picture comes back when you switch it off), start with
-  Windows, updates (check now, *install automatically* while you're away), and **storage**
-  (what takes how much space, *Free up space*, open the folders).
-- **Updates**: installed copies offer new versions from GitHub (*Install now*); after an update
-  Masterpiece shows what's new.
 
 ### As a Windows program (Setup.exe)
 
 ```powershell
 pip install -e .[build]
 winget install JRSoftware.InnoSetup
-python packaging\build.py --setup   # -> dist\Masterpiece-Setup-0.1.0.exe (≈14 MB, no Python needed)
+python packaging\build.py --setup   # -> dist\Masterpiece-Setup-<version>.exe (≈17 MB, no Python needed)
 ```
 
 The setup installs for the current user only (no admin rights) into

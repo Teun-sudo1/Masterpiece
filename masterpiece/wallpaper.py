@@ -546,7 +546,8 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               pos: tuple[float, float] = DEFAULT_LABEL_POS,
               force: str | None = None, style: dict | None = None,
               favourites=None, time_of_day: bool = False,
-              keep: dict | None = None, lock_screen: bool = False, seasons: bool = False) -> dict:
+              keep: dict | None = None, lock_screen: bool = False, seasons: bool = False,
+              record: bool = True) -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -671,6 +672,9 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
         on_screen.append({"screen": screen_name(k), "key": k, "name": p.name, "id": meta.get("id", p.stem),
                           "title": titles[k], "maker": meta.get("maker", ""), "link": meta.get("link", "")})
     cache.kv().set("current:shown", on_screen)
+    if record:                                          # for "previous painting"
+        hist = (cache.kv().get("rotation:history", 1e12) or [])[-19:]
+        cache.kv().set("rotation:history", hist + [{c["key"]: c["name"] for c in on_screen}])
     if same:
         return {"All screens": next(iter(titles.values()))}
     return {screen_name(k): titles[k] for k in chosen}
@@ -695,7 +699,60 @@ def shown_summary() -> list[dict]:
 
 
 def show_from_settings(s: dict | None = None, **kw) -> dict:
-    """show_next() with everything taken from the user's settings."""
+    """show_next() with everything taken from the user's settings. Paintings you just added
+    (the "show first" queue) come before the rest."""
+    from . import settings as _settings
+    s = s or _settings.load()
+    folder = resolve_folder(s.get("folder"))
+    queue = [n for n in cache.kv().get("rotation:prefer", 1e12) or [] if (folder / n).exists()]
+    if queue and "prefer" not in kw and "keep" not in kw:
+        kw["prefer"] = queue
+    shown = _show_from_settings(s, **kw)
+    if queue:
+        now = {c["name"] for c in currently_shown()}
+        cache.kv().set("rotation:prefer", [n for n in queue if n not in now])
+    return shown
+
+
+def queue_first(names: list[str]) -> None:
+    """These paintings come first in the next rotations."""
+    old = cache.kv().get("rotation:prefer", 1e12) or []
+    cache.kv().set("rotation:prefer", list(names) + [n for n in old if n not in names])
+
+
+def show_previous(s: dict | None = None) -> dict | None:
+    """Put the previous painting(s) back. None if there is no earlier one."""
+    hist = cache.kv().get("rotation:history", 1e12) or []
+    if len(hist) < 2:
+        return None
+    cache.kv().set("rotation:history", hist[:-1])
+    return _show_from_settings(s, keep=hist[-2], record=False)
+
+
+def add_to_collection(artworks: list, s: dict | None = None) -> dict:
+    """Download paintings into the collection; they're shown first in the coming rounds."""
+    from . import settings as _settings
+    s = s or _settings.load()
+    folder = resolve_folder(s.get("folder"))
+    ok, failed = [], []
+
+    def one(a):
+        try:
+            return a, download(a, folder, label=bool(s.get("label", True)), pos=label_pos(s.get("labelPos")),
+                               style=label_style(s.get("labelStyle"))), None
+        except Exception as e:
+            return a, None, f"{type(e).__name__}: {e}"
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        for a, path, err in ex.map(one, artworks):
+            (ok if path else failed).append({"id": a.id, "title": a.title, "name": path.name if path else None,
+                                             "error": err})
+    queue_first([d["name"] for d in ok])
+    removed = cleanup(folder, int(s.get("maxFiles") or 50), keep_ids=s.get("favourites") or ())
+    return {"added": ok, "failed": failed, "removed": [p.name for p in removed]}
+
+
+def _show_from_settings(s: dict | None = None, **kw) -> dict:
     from . import settings as _settings
     s = s or _settings.load()
     return show_next(resolve_folder(s.get("folder")), s.get("screens", "each"), bool(s.get("label", True)),

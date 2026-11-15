@@ -5,109 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My collection · Masterpiece</title>
   <link rel="stylesheet" href="styles.css">
-  <style>
-    body { padding-bottom: 40px; }
-    .top.coll { grid-template-columns: 1fr auto; }
-    .coll-head { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; margin: 0 0 18px; }
-    .coll-head h2 { margin: 0; font: 600 26px/1.2 var(--serif); }
-    .coll-head .sub { color: var(--muted); font-size: 14px; }
-    .now { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 22px; }
-    .now .pill { padding: 6px 12px; border-radius: 999px; font-size: 13px;
-      background: var(--panel); border: 1px solid var(--accent); }
-    .now .pill b { color: var(--accent); font-weight: 600; margin-right: 6px; }
-    .card .thumb { cursor: pointer; display: block; }
-    .card h3 a { color: inherit; text-decoration: none; }
-    .card h3 a:hover { text-decoration: underline; }
-    .now .pill { color: var(--text); text-decoration: none; }
-    .now .pill:hover { background: var(--panel-2); }
-    .card .curated { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; font-size: 12px;
-      background: rgba(0,0,0,.6); border: 1px solid var(--accent); color: var(--accent); cursor: help; }
-    .card .curated.low { top: 40px; }
-    .card .fav { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; padding: 0;
-      display: grid; place-items: center; border-radius: 50%;
-      background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.3); color: #fff; }
-    .card .fav svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
-    .card .fav:hover { border-color: #fff; }
-    .card .fav.on { color: #ff6b81; border-color: #ff6b81; }
-    .card .fav.on svg { fill: currentColor; }
-    .card .onscreen { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px;
-      font-size: 12px; font-weight: 600; background: var(--accent); color: var(--accent-ink); }
-    .card .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-    .card .actions button { padding: 5px 10px; font-size: 12px; }
-    .card .actions .danger { border-color: color-mix(in srgb, var(--danger) 50%, var(--line)); }
-    .card .actions .danger:hover { border-color: var(--danger); }
-    .empty { color: var(--muted); padding: 40px 0; text-align: center; }
-    details.hidden-list { margin-top: 34px; }
-    details.hidden-list summary { cursor: pointer; color: var(--muted); }
-    .hidden-list ul { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; }
-    .hidden-list li { display: flex; gap: 12px; align-items: center; justify-content: space-between;
-      background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
-    .hidden-list li span { color: var(--muted); font-size: 13px; }
-  </style>
 </head>
 <body>
-  <header class="top coll">
-    <div class="brand">
-      <h1>Masterpiece</h1>
-      <p><a href="/">← Back to the paintings</a></p>
-    </div>
-    <button id="restoreBtn" class="restore" hidden title="Stop Masterpiece and put back the wallpaper you had before">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg>
-      Restore my wallpaper</button>
-  </header>
+  <div class="layout" id="layout">
+    <aside class="panel" id="panel" aria-label="Filters">
+      <div class="panel-head">
+        <span>Filters</span>
+        <button type="button" class="icon-btn ghost" id="panelToggle" title="Hide filters" aria-controls="panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      </div>
 
-  <main>
-    <div class="coll-head">
-      <h2>My collection</h2>
-      <span class="sub" id="sub"></span>
-    </div>
-    <div class="now" id="now"></div>
-    <div id="grid" class="grid"></div>
-    <p class="empty" id="empty" hidden>Your collection is empty. Select paintings and click
-      <b>Set as wallpaper</b> to add them.</p>
+      <div class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+        <input id="q" type="search" placeholder="Title or artist…" aria-label="Search your collection">
+      </div>
 
-    <details class="hidden-list" id="hiddenBox" hidden>
-      <summary id="hiddenSummary">Hidden paintings</summary>
-      <ul id="hiddenList"></ul>
-    </details>
-  </main>
+      <details class="fgroup" open>
+        <summary>Show</summary>
+        <div class="chips" id="showChips" role="group" aria-label="Show">
+          <button type="button" data-show="all" aria-pressed="true">All</button>
+          <button type="button" data-show="fav">♥ Favourites</button>
+          <button type="button" data-show="curator">Curator's picks</button>
+          <button type="button" data-show="screen">On screen</button>
+        </div>
+      </details>
+
+      <details class="fgroup" open>
+        <summary>Art</summary>
+        <label class="field">Subject <select id="subject"><option value="">Anything</option></select></label>
+        <label class="field">Period <select id="period"><option value="">Any time</option></select></label>
+        <label class="field">Shape
+          <select id="shape"><option value="">Any shape</option><option value="landscape">Landscape</option>
+            <option value="portrait">Portrait</option></select></label>
+      </details>
+
+      <details class="fgroup">
+        <summary>Museums <span class="val" id="museumSummary"></span></summary>
+        <div class="checklist" id="museums" role="group" aria-label="Museums"></div>
+      </details>
+
+      <details class="fgroup" open>
+        <summary>Order</summary>
+        <label class="field"><select id="sort" aria-label="Order">
+          <option value="new">Newest first</option><option value="old">Oldest first</option>
+          <option value="title">Title</option><option value="maker">Artist</option><option value="year">Year</option>
+        </select></label>
+      </details>
+    </aside>
+
+    <button type="button" class="panel-open" id="panelOpen" title="Show filters">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span>Filters</span></button>
+
+    <main class="content">
+      <p class="sub" id="sub"></p>
+      <div id="grid" class="grid"></div>
+      <p class="empty" id="empty" hidden></p>
+
+      <details class="hidden-list" id="hiddenBox" hidden>
+        <summary id="hiddenSummary">Hidden paintings</summary>
+        <ul id="hiddenList"></ul>
+      </details>
+    </main>
+  </div>
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <script src="shell.js"></script>
   <script>
     "use strict";
-    const $ = (id) => document.getElementById(id);
-
-    async function api(path, body) {
-      const opts = body === undefined ? {} : {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-      };
-      const r = await fetch(path, opts);
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
-      return data;
-    }
-    function el(tag, attrs = {}, ...children) {
-      const n = document.createElement(tag);
-      for (const [k, v] of Object.entries(attrs)) {
-        if (k === "class") n.className = v;
-        else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
-        else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
-      }
-      for (const c of children) n.append(c);
-      return n;
-    }
-    let toastTimer;
-    function toast(msg, ms = 5000) {
-      const t = $("toast");
-      t.textContent = msg; t.hidden = false;
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => (t.hidden = true), ms);
-    }
-    const skippedMsg = (r) => {
-      const now = Object.values(r.wallpapers || {});
-      return `Skipped and removed.${now.length ? ` Now showing ${now.map((t) => `“${t}”`).join(" and ")}.` : ""}`;
-    };
+    const coll = { items: [], banned: [], show: "all", subjects: {}, periods: {} };
+    const infoUrl = (name) => `painting.html?name=${encodeURIComponent(name)}`;
+    const fold = (s) => (s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const yearOf = (s) => { const m = String(s || "").match(/\d{4}/); return m ? Number(m[0]) : null; };
     const mb = (b) => `${(b / 1048576).toFixed(b > 10485760 ? 0 : 1)} MB`;
 
     async function act(body, okMsg) {
@@ -117,76 +86,129 @@
         load();
       } catch (e) { toast(`Didn't work: ${e.message}`); }
     }
-
-    const infoUrl = (name) => `painting.html?name=${encodeURIComponent(name)}`;
-    const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>';
+    const skippedMsg = (r) => {
+      const now = Object.values(r.wallpapers || {});
+      return `Skipped and removed.${now.length ? ` Now showing ${now.map((t) => `“${t}”`).join(" and ")}.` : ""}`;
+    };
 
     function heart(it) {
       const b = el("button", { type: "button", class: `fav${it.favourite ? " on" : ""}`,
         "aria-pressed": String(!!it.favourite),
-        title: it.favourite ? "Favourite: comes up more often. Click to undo." : "Favourite: show this one more often",
+        title: it.favourite ? "Favourite: comes up more often and is always kept. Click to undo." : "Favourite: show this one more often",
         onclick: () => act({ action: "favourite", name: it.name, on: !it.favourite },
-          it.favourite ? "No longer a favourite." : "Favourite! It comes up about three times as often.") });
-      b.innerHTML = HEART;
+          it.favourite ? "No longer a favourite." : "Favourite! It comes up about three times as often.") },
+        icon("heart"));
       return b;
     }
 
     function card(it) {
+      const badges = [];
+      if (it.onScreen) badges.push(el("span", { class: "badge-top on" }, "On screen"));
+      if (it.curator) badges.push(el("span", { class: "badge-top", title: it.curator }, "Curator's pick"));
       return el("article", { class: "card" },
         el("a", { class: "thumb", href: infoUrl(it.name), title: "About this painting" },
           el("img", { src: `/api/thumb?name=${encodeURIComponent(it.name)}`, alt: it.title, loading: "lazy" })),
-        ...(it.onScreen ? [el("span", { class: "onscreen" }, "On screen now")] : []),
-        ...(it.curator ? [el("span", { class: `curated${it.onScreen ? " low" : ""}`, title: it.curator }, "Curator's pick")] : []),
+        el("div", { class: "badges" }, ...badges),
         heart(it),
         el("div", { class: "body" },
           el("h3", { title: it.title }, el("a", { href: infoUrl(it.name) }, it.title)),
           el("div", { class: "maker" }, [it.maker, it.year].filter(Boolean).join(", ")),
-          el("div", { class: "meta" },
-            el("span", { class: "badge" }, it.museum || "—"),
+          el("div", { class: "meta" }, el("span", { class: "badge" }, it.museum || "—"),
             el("span", {}, it.width ? `${it.width} × ${it.height}` : "")),
-          el("div", { class: "actions" },
-            el("button", { type: "button", class: "primary",
+          el("div", { class: "card-actions" },
+            el("button", { type: "button", class: "small", title: "Put it on your desktop now",
               onclick: () => act({ action: "show", name: it.name },
                 (r) => `Now showing ${Object.values(r.wallpapers).map((t) => `“${t}”`).join(" and ")}.`) }, "Show now"),
-            ...(it.link ? [el("button", { type: "button", onclick: () => window.open(it.link, "_blank", "noopener") }, "Museum page")] : []),
             it.onScreen
-              ? el("button", { type: "button", title: "Remove it from your collection and show another painting there",
+              ? el("button", { type: "button", class: "small", title: "Remove it and show another painting there",
                   onclick: () => act({ action: "skip", name: it.name }, skippedMsg) }, "Skip")
-              : el("button", { type: "button", onclick: () => act({ action: "remove", name: it.name }, "Removed from your collection.") }, "Remove"),
-            el("button", { type: "button", class: "danger", title: "Remove it and never show it in the results again",
-              onclick: () => act({ action: "ban", name: it.name }, "Removed. It won't show up in the results again.") },
-              "Never show again"))));
+              : el("button", { type: "button", class: "small", onclick: () => act({ action: "remove", name: it.name }, "Removed from your collection.") }, "Remove"),
+            el("button", { type: "button", class: "small danger", title: "Remove it and never show it in the results again",
+              onclick: () => act({ action: "ban", name: it.name }, "Removed. It won't show up in search results again.") }, "Never"))));
+    }
+
+    function filtered() {
+      const q = fold($("q").value.trim()).split(/\s+/).filter(Boolean);
+      const subj = coll.subjects[$("subject").value];
+      const per = coll.periods[$("period").value];
+      const shape = $("shape").value;
+      const museums = new Set([...document.querySelectorAll("#museums input:checked")].map((i) => i.value));
+      let list = coll.items.filter((it) => {
+        const hay = fold(`${it.title} ${it.maker}`);
+        if (q.length && !q.every((w) => hay.includes(w))) return false;
+        if (coll.show === "fav" && !it.favourite) return false;
+        if (coll.show === "curator" && !it.curator) return false;
+        if (coll.show === "screen" && !it.onScreen) return false;
+        if (subj && !subj.some((t) => new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(fold(it.title)))) return false;
+        if (per) { const y = yearOf(it.year); if (y === null || y < per.start || y >= per.end) return false; }
+        if (shape === "landscape" && !(it.width >= it.height)) return false;
+        if (shape === "portrait" && !(it.height > it.width)) return false;
+        if (museums.size && !museums.has(it.museum)) return false;
+        return true;
+      });
+      const by = $("sort").value;
+      const cmp = { title: (a, b) => a.title.localeCompare(b.title), maker: (a, b) => a.maker.localeCompare(b.maker),
+                    year: (a, b) => (yearOf(a.year) ?? 9999) - (yearOf(b.year) ?? 9999) }[by];
+      if (cmp) list = [...list].sort(cmp);
+      else if (by === "old") list = [...list].reverse();
+      return list;
+    }
+
+    function render() {
+      const list = filtered();
+      $("grid").replaceChildren(...list.map(card));
+      const total = coll.items.length, bytes = coll.items.reduce((s, i) => s + i.bytes, 0);
+      const favs = coll.items.filter((i) => i.favourite).length;
+      $("sub").textContent = total ? (list.length === total ? `${total} paintings` : `${list.length} of ${total} paintings`)
+        + ` · ${mb(bytes)}${favs ? ` · ${favs} favourite${favs === 1 ? "" : "s"}` : ""}` : "";
+      $("empty").hidden = list.length > 0;
+      $("empty").textContent = total ? "Nothing matches these filters."
+        : "Your collection is empty. Add paintings from Search art, or let the Curator choose for you.";
+      const n = [...document.querySelectorAll("#museums input:checked")].length;
+      $("museumSummary").textContent = n ? `${n} chosen` : "all";
     }
 
     async function load() {
       const d = await api("/api/collection");
-      const total = d.items.reduce((s, i) => s + i.bytes, 0);
-      $("sub").textContent = d.items.length
-        ? `${d.items.length} painting${d.items.length === 1 ? "" : "s"} · ${mb(total)} · ${d.folder}` : "";
-      $("grid").replaceChildren(...d.items.map(card));
-      $("empty").hidden = d.items.length > 0;
-      $("now").replaceChildren(...d.current.map((c) =>
-        el("a", { class: "pill", href: infoUrl(c.name), title: "About this painting" },
-          el("b", {}, c.screen), `${c.title}${c.maker ? ` — ${c.maker}` : ""}`)));
-      const favs = d.items.filter((i) => i.favourite).length;
-      if (favs) $("sub").textContent += ` · ${favs} favourite${favs === 1 ? "" : "s"}`;
-      $("restoreBtn").hidden = !(d.backup || (d.rotation && d.rotation.active));
+      coll.items = d.items;
+      setCollectionCount(d.items.length);
+      const museums = [...new Set(d.items.map((i) => i.museum).filter(Boolean))].sort();
+      const checked = new Set([...document.querySelectorAll("#museums input:checked")].map((i) => i.value));
+      $("museums").replaceChildren(...museums.map((m) => el("label", { class: "check" },
+        el("input", { type: "checkbox", value: m, checked: checked.has(m), onchange: render }), el("span", { class: "name" }, m))));
       $("hiddenBox").hidden = !d.banned.length;
       $("hiddenSummary").textContent = `Hidden paintings (${d.banned.length})`;
       $("hiddenList").replaceChildren(...d.banned.map((b) =>
         el("li", {}, el("div", {}, b.title, " ", el("span", {}, [b.maker, b.museum].filter(Boolean).join(" · "))),
-          el("button", { type: "button", onclick: () => act({ action: "unban", id: b.id }, "It can show up in the results again.") }, "Unhide"))));
+          el("button", { type: "button", class: "small", onclick: () => act({ action: "unban", id: b.id }, "It can show up in search results again.") }, "Unhide"))));
+      render();
     }
 
-    $("restoreBtn").addEventListener("click", async () => {
-      try {
-        const r = await api("/api/rotation", { action: "restore" });
-        toast(r.restored === "previous" ? "Masterpiece stopped. Your previous wallpaper is back."
-          : r.restored === "default" ? "Masterpiece stopped. Windows' default wallpaper is back." : "Masterpiece stopped.");
-        load();
-      } catch (e) { toast(`Couldn't restore the wallpaper: ${e.message}`); }
-    });
-    load().catch((e) => toast(`Couldn't load your collection: ${e.message}`));
+    async function init() {
+      mountShell("collection");
+      setupPanel("collection");
+      const o = await api("/api/options");
+      for (const x of o.subjects) {
+        coll.subjects[x.key] = (x.terms || []).map(fold);
+        $("subject").append(el("option", { value: x.key }, x.label));
+      }
+      for (const x of o.periods) $("period").append(el("option", { value: x.key }, x.label));
+      const P = { pre1600: [-3000, 1600], 1600: [1600, 1750], 1750: [1750, 1850], 1850: [1850, 1900], 1900: [1900, 2100] };
+      for (const [k, [start, end]] of Object.entries(P)) coll.periods[k] = { start, end };
+      $("q").addEventListener("input", render);
+      for (const id of ["subject", "period", "shape", "sort"]) $(id).addEventListener("change", render);
+      $("showChips").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-show]");
+        if (!b) return;
+        coll.show = b.dataset.show;
+        for (const x of $("showChips").children) x.setAttribute("aria-pressed", String(x === b));
+        render();
+      });
+      const want = new URLSearchParams(location.search).get("show");
+      if (want) $("showChips").querySelector(`[data-show="${want}"]`)?.click();
+      await load();
+    }
+    init().catch((e) => toast(`Couldn't load your collection: ${e.message}`));
   </script>
 </body>
 </html>

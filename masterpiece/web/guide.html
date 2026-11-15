@@ -33,22 +33,19 @@
     <p class="lede">Public-domain paintings from great museums, fitted to your screens.</p>
 
     <ol class="steps">
-      <li><span><b>Browse.</b> Pick museums, a subject or period, or search for an artist.</span></li>
-      <li><span><b>Select.</b> Click <b>+</b> on the paintings you like. Click a picture to see it larger.</span></li>
-      <li><span><b>Set as wallpaper.</b> Choose how below, then click the button in the bottom right.</span></li>
+      <li><span><b>Search art.</b> Find paintings by artist, subject, period or region, and click <b>+</b> on the ones you like.
+        Then press <b>Add to collection</b>.</span></li>
+      <li><span><b>Curator.</b> Press <b>Start</b>. Masterpiece puts a painting on your desktop, fitted to each screen,
+        and changes it as often as you like.</span></li>
+      <li><span><b>Let it be personal.</b> Choose <b>Curator chooses</b> and set your taste with the sliders: every day
+        the Curator adds a few new paintings it thinks you'll love.</span></li>
     </ol>
-
-    <div class="modes">
-      <div><b>Masterpiece rotation:</b> a new painting at the interval you choose, fitted to each screen.</div>
-      <div><b>Windows slideshow:</b> Windows shuffles them itself and crops them to fit.</div>
-      <div><b>Just once:</b> set it now and leave it.</div>
-    </div>
     <div class="advice" id="advice" hidden></div>
 
-    <button class="primary" id="start">Start choosing paintings</button>
+    <button class="primary" id="start">Start</button>
 
-    <p class="foot">Paintings are saved in <span id="folder">Pictures\Masterpiece</span>. Stop the rotation any time
-      with <b>stop</b> at the bottom of the app.<br>
+    <p class="foot">Paintings are saved in <span id="folder">Pictures\Masterpiece</span>. Pause or stop any time on the
+      Curator tab; <b>Restore my wallpaper</b> puts your own wallpaper back.<br>
       An independent open-source project, not an official app of any museum.</p>
   </main>
 
@@ -79,8 +76,8 @@
         const scr = o.screens || [];
         if (scr.length > 1 || scr.some((m) => m.height > m.width)) {
           const portrait = scr.some((m) => m.height > m.width);
-          $("advice").innerHTML = `<b>Tip for your ${scr.length} screens:</b> use <b>Masterpiece rotation</b>` +
-            (portrait ? ", so your portrait screen gets tall paintings." : ", so each screen gets its own painting.");
+          $("advice").innerHTML = `<b>Your ${scr.length > 1 ? `${scr.length} screens` : "screen"}:</b> every screen gets a painting of its own shape` +
+            (portrait ? ", so your portrait screen gets tall paintings." : ".");
           $("advice").hidden = false;
         }
       } catch { /* the guide works without this */ }

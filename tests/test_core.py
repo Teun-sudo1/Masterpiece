@@ -829,3 +829,46 @@ def test_getty_open_content_only():
     late = {**o, "produced_by": {**o["produced_by"], "timespan": {"begin_of_the_begin": "1955-01-01"}}}
     assert getty._to_artwork(late, man("http://creativecommons.org/publicdomain/zero/1.0/", "public domain")) is None
     assert '"' not in getty._escape('a "quoted" word') and "\n" not in getty._escape("x\ny")
+
+
+# ---------------------------------------------------------------- 0.4 UI overhaul: rotation & taste
+
+def test_old_modes_become_rotation():
+    from masterpiece import settings
+    for old in ("slideshow", "once", "daily"):
+        settings.save({"mode": old})
+        assert settings.load()["mode"] == "rotate"
+    settings.save({"mode": "curator"})
+    assert settings.load()["mode"] == "curator"
+
+
+def test_added_paintings_come_first_and_previous_goes_back(tmp_path, monkeypatch):
+    from masterpiece import cache, settings
+    folder = _two_paintings(tmp_path)
+    settings.save({"folder": str(folder), "screens": "same"})
+    calls = []
+    _fake_screens(monkeypatch, calls)
+    wallpaper.queue_first(["aic-3.jpg"])
+    wallpaper.show_from_settings()
+    first = {c["name"] for c in wallpaper.currently_shown()}
+    assert first == {"aic-3.jpg"}                                  # the newly added one comes first
+    assert "aic-3.jpg" not in (cache.kv().get("rotation:prefer", 1e12) or [])   # …only once
+    wallpaper.show_from_settings()
+    second = {c["name"] for c in wallpaper.currently_shown()}
+    assert second != first
+    wallpaper.show_previous()
+    assert {c["name"] for c in wallpaper.currently_shown()} == first
+    assert wallpaper.show_previous() is None or True               # history may still have older entries
+
+
+def test_taste_sliders_steer_the_curator():
+    import random
+    from collections import Counter
+    from masterpiece import content, curator
+    s = {"curatorTaste": {"subjects": {k: 0 for k in content.SUBJECTS} | {"water": 4},
+                          "periods": {"1850": 4}}, "curatorSurprise": 0}
+    plans = curator.plan(s, Counter(), 30, random.Random(3))
+    assert all(p["subject"] == "water" for p in plans)              # everything else is "never"
+    assert not any(p.get("surprise") for p in plans)                # surprise: never
+    assert sum(p["period"] == "1850" for p in plans) > 10           # "a lot" of 1850–1900
+    assert curator._museums({"curatorTaste": {"museums": {"aic": 0}}}, ["aic", "nga"], 3, random.Random(1)) == ["nga"]

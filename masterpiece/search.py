@@ -35,9 +35,10 @@ def _page(mod, page: int, api_args: dict) -> Results:
     return Results(raw, more=more)
 
 
-def _collect(mod, start_page: int, api_args: dict, filter_args: dict, seen: set[str]) -> dict:
+def _collect(mod, start_page: int, api_args: dict, filter_args: dict, seen: set[str],
+             max_pages: int = MAX_PAGES_PER_CALL) -> dict:
     found, page, more, scanned = [], start_page, True, 0
-    while more and len(found) < TARGET_PER_SOURCE and page < start_page + MAX_PAGES_PER_CALL:
+    while more and len(found) < TARGET_PER_SOURCE and page < start_page + max_pages:
         raw = _page(mod, page, api_args)
         page += 1
         more = raw.more
@@ -54,7 +55,8 @@ def search_all(source_keys: list[str], *, cursors: dict[str, int] | None = None,
                subject: str | None = None, period: str | None = None, hide=(),
                region: str | None = None,
                min_width: int = 0, orientation: str = "any",
-               targets: list[tuple[int, int]] | None = None, sharp: bool = False) -> dict:
+               targets: list[tuple[int, int]] | None = None, sharp: bool = False,
+               max_pages: int = MAX_PAGES_PER_CALL) -> dict:
     cursors = cursors or {}
     keys = [k for k in source_keys if k in SOURCES and cursors.get(k, 1) > 0]
     # A museum that has (almost) nothing from the chosen region is skipped
@@ -73,7 +75,7 @@ def search_all(source_keys: list[str], *, cursors: dict[str, int] | None = None,
     scanned = 0
 
     with ThreadPoolExecutor(max_workers=max(1, len(keys))) as ex:
-        futures = {k: ex.submit(_collect, SOURCES[k], cursors.get(k, 1), api_args, filter_args, set())
+        futures = {k: ex.submit(_collect, SOURCES[k], cursors.get(k, 1), api_args, filter_args, set(), max_pages)
                    for k in keys}
         for k, fut in futures.items():
             try:

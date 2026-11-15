@@ -28,7 +28,7 @@ DEFAULTS: dict = {
     "labelStyle": {"look": "dark", "font": "sans", "size": "m", "text": "full"},
     "region": "",
     "maxFiles": 50,
-    "mode": "rotate",             # "slideshow" | "rotate" | "curator" | "once"
+    "mode": "rotate",             # "rotate" (my collection) | "curator" (the Curator adds new ones daily)
     "interval": 60,               # minutes between paintings (slideshow / rotate), 1 … 44640
     "screens": "each",            # multi-monitor: "each" | "same" | "span"
     "introSeen": False,
@@ -44,6 +44,10 @@ DEFAULTS: dict = {
     "lockScreen": False,          # also put the painting on the Windows lock screen
     "seasons": False,             # winter scenes in winter, blossom in spring, …
     "curatorDaily": 3,            # Curator mode: new paintings it adds per day
+    # Curator taste: 0 never · 1 less · 2 normal (default) · 3 more · 4 a lot
+    "curatorTaste": {"subjects": {}, "periods": {}, "regions": {}, "museums": {}},
+    "curatorSurprise": 2,         # how often the Curator surprises you (0 never … 4 often)
+    "curatorMutedArtists": [],    # artists from your collection the Curator shouldn't look for
     "apiKeys": {},
 }
 
@@ -65,6 +69,8 @@ def load() -> dict:
         s["knownSources"] = list(SOURCES)
         if s["mode"] == "daily":              # older name
             s["mode"], s["interval"] = "rotate", 1440
+        if s["mode"] not in ("rotate", "curator"):  # Windows slideshow / "just once" were dropped in 0.4
+            s["mode"] = "rotate"
     except (OSError, ValueError):
         pass
     return s
