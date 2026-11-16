@@ -172,6 +172,8 @@ pytest                 # including live API tests
 
 New features get a tour step in `masterpiece/web/tour.js` (`since` = the version that adds them).
 `tests/test_tour.py` plays the whole tour in a headless Edge and fails if a spotlight misses its target.
+After a redesign, `python packaging\screenshot.py` remakes `docs/screenshot.png` (the picture at the top),
+with temporary settings, so it never shows your own collection.
 
 ## Licence
 
