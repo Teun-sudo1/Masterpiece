@@ -90,7 +90,7 @@ a { color: var(--accent); }
 .tab-count { min-width: 26px; text-align: center; font-size: 11px; padding: 1px 7px; border-radius: 999px;
   background: var(--panel-3); color: var(--muted); }
 .tab-count:empty { visibility: hidden; }     /* keeps its space, so the tabs never shift */
-.ver { margin-left: auto; min-width: 64px; padding: 4px 10px; border-radius: 999px; font-size: 12px; color: var(--muted);
+.ver { margin-left: auto; min-width: 64px; padding: 4px 10px; text-align: center; border-radius: 999px; font-size: 12px; color: var(--muted);
   background: transparent; border: 1px solid transparent; }
 .ver:hover { border-color: var(--line-2); color: var(--text); }
 .ver.new { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600; }
@@ -491,10 +491,12 @@ dialog .prev { left: 8px; } dialog .next { right: 8px; }
 /* ---------- guided tour */
 .tour-block { position: fixed; inset: 0; z-index: 40; }
 .tour-hole { position: fixed; z-index: 41; border-radius: 10px; pointer-events: none;
-  box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgba(0,0,0,.62); transition: all .25s ease; }
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px rgba(0,0,0,.62); }
 .tour-pop { position: fixed; z-index: 42; width: min(340px, calc(100vw - 24px)); padding: 16px 18px 14px;
   border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line-2); box-shadow: 0 14px 40px rgba(0,0,0,.5);
-  transition: left .25s ease, top .25s ease; }
+}
+.tour-moving .tour-hole { transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease; }
+.tour-moving .tour-pop { transition: left .25s ease, top .25s ease; }
 .tour-pop h3 { margin: 4px 0 6px; font: italic 700 18px/1.25 var(--sans); }
 .tour-pop p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
 .tour-kicker { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .08em;
@@ -502,7 +504,7 @@ dialog .prev { left: 8px; } dialog .next { right: 8px; }
 .tour-kicker span { color: var(--muted); letter-spacing: 0; }
 .tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .tour-actions > span { display: inline-flex; gap: 6px; }
-@media (prefers-reduced-motion: reduce) { .tour-hole, .tour-pop { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tour-moving .tour-hole, .tour-moving .tour-pop { transition: none; } }
 
 .toast {
   position: fixed; bottom: calc(var(--rotbar) + 72px); left: 50%; transform: translateX(-50%); z-index: 30;

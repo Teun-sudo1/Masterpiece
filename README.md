@@ -41,6 +41,9 @@ Click a painting for its info card with the museum's description or facts.
   artists you like (from your collection and favourites), and how often you want to be surprised.
   Each pick says why it was chosen ("Because you like Claude Monet", "A winter scene for December").
 
+The first time you open Masterpiece a short **tour** shows you around; after an update it shows only
+what's new (Settings → *Take the tour* plays it all again).
+
 **Settings** — dark or light look (or as Windows), how many paintings to keep, start with Windows, updates (*install automatically*
 while you're away), storage (what takes how much space, *Free up space*), the guide, and a problem
 report (anonymised, opened as a pre-filled GitHub issue).
@@ -166,6 +169,9 @@ pip install -e .[dev]
 pytest -m "not live"   # offline tests
 pytest                 # including live API tests
 ```
+
+New features get a tour step in `masterpiece/web/tour.js` (`since` = the version that adds them).
+`tests/test_tour.py` plays the whole tour in a headless Edge and fails if a spotlight misses its target.
 
 ## Licence
 

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Tour check</title>
+  <style>body { margin: 0; } iframe { border: 0; display: block; }</style>
+</head>
+<body>
+  <!-- Used by tests/test_tour.py: plays every tour step in Search art (in an iframe) and checks
+       that the spotlight surrounds its target and the card stays on screen and off the target. -->
+  <iframe id="f"></iframe>
+  <pre id="result"></pre>
+  <script>
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const SIZES = [[1400, 860], [1024, 700]];
+    const problems = [];
+    let checked = 0;
+
+    async function load(w, h, theme) {
+      const f = document.getElementById("f");
+      f.style.width = `${w}px`;
+      f.style.height = `${h}px`;
+      await new Promise((r) => { f.onload = r; f.src = `/?check=${Math.random()}`; });
+      const win = f.contentWindow;
+      for (let i = 0; i < 200 && !win.document.querySelector(".card .pick"); i++) await sleep(100);
+      win.document.documentElement.dataset.theme = theme;
+      const st = win.document.createElement("style");      // measure where things end up, not mid-slide
+      st.textContent = ".tour-hole, .tour-pop { transition: none !important; }";
+      win.document.head.append(st);
+      await sleep(300);
+      return win;
+    }
+
+    async function play(win, label, steps, update) {
+      const doc = win.document, W = win.innerWidth, H = win.innerHeight;
+      const titles = steps.map((s) => s.title);
+      win.startTour(steps.slice(), update);
+      for (let i = 0; ; i++) {
+        let ok = false;
+        for (let n = 0; n < 80 && !ok; n++) {
+          await sleep(100);
+          const cur = win.eval("tour.steps[tour.i]");
+          ok = win.eval("tour.i") === i && cur && doc.getElementById("tourTitle")
+            && doc.getElementById("tourTitle").textContent === cur.title;
+        }
+        if (!ok) { problems.push(`${label}: step ${i + 1} never appeared`); break; }
+        await sleep(400);                                   // let the spotlight follow late layout changes
+        const step = win.eval("tour.steps[tour.i]");
+        const t = doc.querySelector(step.sel).getBoundingClientRect();
+        const hole = doc.getElementById("tourHole").getBoundingClientRect();
+        const pop = doc.getElementById("tourPop").getBoundingClientRect();
+        const where = `${label}: “${step.title}” (${step.sel})`;
+        if (hole.left > t.left + 0.5 || hole.top > t.top + 0.5 || hole.right < t.right - 0.5 || hole.bottom < t.bottom - 0.5) {
+          problems.push(`${where}: spotlight [${[hole.left, hole.top, hole.right, hole.bottom].map(Math.round)}] `
+            + `doesn't cover the target [${[t.left, t.top, t.right, t.bottom].map(Math.round)}]`);
+        }
+        if (t.right <= 0 || t.bottom <= 0 || t.left >= W || t.top >= H) problems.push(`${where}: target is off screen`);
+        if (pop.left < 0 || pop.top < 0 || pop.right > W + 0.5 || pop.bottom > H + 0.5) problems.push(`${where}: card is off screen`);
+        if (!(pop.right <= t.left || pop.left >= t.right || pop.bottom <= t.top || pop.top >= t.bottom)) {
+          problems.push(`${where}: card covers the target`);
+        }
+        checked++;
+        if (i === win.eval("tour.steps.length") - 1) break;
+        win.tourGo(1);
+      }
+      const shown = win.eval("tour.steps.map((s) => s.title)");
+      for (const t of titles) if (!shown.includes(t)) problems.push(`${label}: step “${t}” was skipped (target not visible)`);
+      win.finishTour();
+    }
+
+    (async () => {
+      try {
+        for (const [w, h] of SIZES) {
+          for (const theme of ["dark", "light"]) {
+            const win = await load(w, h, theme);
+            const all = win.eval("TOUR_STEPS");
+            await play(win, `first use ${w}×${h} ${theme}`, all, null);
+            await play(win, `after an update ${w}×${h} ${theme}`, all.filter((s) => s.news), "9.9.9");
+          }
+        }
+      } catch (e) { problems.push(`check failed: ${e && e.stack || e}`); }
+      document.getElementById("result").textContent = JSON.stringify({ checked, problems });
+    })();
+  </script>
+</body>
+</html>

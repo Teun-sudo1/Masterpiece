@@ -105,6 +105,19 @@ async function showTourStep() {
         el("button", { type: "button", class: "primary small", onclick: () => tourGo(1) }, last ? "Done" : "Next"))));
   placeTour();
   $("tourPop").querySelector(".primary").focus();
+  followTarget();
+}
+
+// the page may still shift (results, scrollbar, the version text arriving): keep the spotlight on it
+let lastRect = "";
+function followTarget() {
+  clearInterval(followTarget.timer);
+  followTarget.timer = setInterval(() => {
+    const t = tour.steps.length && tourTarget();
+    const r = t && t.getBoundingClientRect();
+    const key = r ? `${r.left}|${r.top}|${r.width}|${r.height}|${innerWidth}|${innerHeight}` : "";
+    if (key && key !== lastRect) { lastRect = key; placeTour(); }
+  }, 150);
 }
 
 function placeTour() {
@@ -128,11 +141,14 @@ function tourGo(d) {
   if (i < 0) return;
   if (i >= tour.steps.length) return finishTour();
   tour.i = i;
+  document.body.classList.add("tour-moving");      // glide from one step to the next
   showTourStep();
 }
 
 function finishTour() {
   tour.steps = [];
+  clearInterval(followTarget.timer);
+  document.body.classList.remove("tour-moving");
   for (const id of ["tourBlock", "tourHole", "tourPop"]) $(id) && $(id).remove();
   if (tour.current) api("/api/settings", { tourVersion: tour.current }).catch(() => {});
   if (tour.update) api("/api/update", { action: "seenWhatsNew" }).catch(() => {});
