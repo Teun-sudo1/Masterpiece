@@ -21,7 +21,7 @@ from pathlib import Path
 
 from . import backup, cache, content, monitors, schedule, settings, sources, wallpaper
 from .models import Artwork
-from .net import fetch
+from .net import Blocked, fetch
 from .search import search_all
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -142,6 +142,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._search(qs)
                 if url.path == "/api/img":
                     return self._img(qs.get("u", ""))
+            except Blocked as e:                      # a museum asked us to slow down: no trace, just say so
+                return self._error(503, str(e))
             except Exception as e:
                 import traceback
                 traceback.print_exc()

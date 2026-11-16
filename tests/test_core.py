@@ -930,3 +930,26 @@ def test_release_notes_without_code_fences():
     r = update._parse({"tag_name": "v0.4.2", "body": "```\r\nNew look\r\n- Four tabs\r\n```", "draft": False,
                        "prerelease": False, "html_url": "https://x", "assets": [setup]})
     assert r["notes"] == "New look\r\n- Four tabs"
+
+
+def test_a_server_that_says_too_many_requests_is_left_alone(monkeypatch):
+    import email.message
+    import urllib.error
+    from masterpiece import net
+    monkeypatch.setattr(net, "_host_slots", {})
+    calls = []
+
+    def refuse(req, timeout=None):
+        calls.append(req.full_url)
+        h = email.message.Message()
+        h["Retry-After"] = "120"
+        raise urllib.error.HTTPError(req.full_url, 429, "Too many requests", h, None)
+
+    monkeypatch.setattr(net.urllib.request, "urlopen", refuse)
+    url = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/X.jpg/500px-X.jpg"
+    with pytest.raises(net.Blocked):
+        net.fetch(url)
+    with pytest.raises(net.Blocked):          # paused: fails at once, without asking Wikimedia again
+        net.fetch(url.replace("X.jpg", "Y.jpg"))
+    assert len(calls) == 1
+    assert net._slot(url).paused_until > 0

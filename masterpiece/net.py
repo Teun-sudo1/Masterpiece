@@ -43,20 +43,34 @@ HOST_LIMITS = {   # host: (max simultaneous, min seconds between requests)
     "manifests.collections.yale.edu": (2, 0.1),
     "data.getty.edu": (2, 0.1),
     "media.getty.edu": (2, 0.1),
-    "upload.wikimedia.org": (2, 0.1),
+    "upload.wikimedia.org": (1, 1.0),              # rare files are rendered on request: one a second
 }
 _host_slots: dict[str, "_Slot"] = {}
 _host_lock = threading.Lock()
 
 
+MAX_WAIT = 20          # wait at most this long for a server that asked us to slow down; else give up
+
+
 class _Slot:
-    def __init__(self, n: int, gap: float):
+    def __init__(self, host: str, n: int, gap: float):
+        self.host = host
         self.sem = threading.BoundedSemaphore(n)
         self.gap = gap
         self.last = 0.0
         self.lock = threading.Lock()
+        self.paused_until = 0.0
+
+    def pause(self, seconds: float) -> None:
+        """The server said "too many requests": leave it alone for a while."""
+        self.paused_until = max(self.paused_until, time.monotonic() + seconds)
 
     def __enter__(self):
+        rest = self.paused_until - time.monotonic()
+        if rest > MAX_WAIT:
+            raise Blocked(f"{self.host} asked us to slow down; trying again in {round(rest)} s")
+        if rest > 0:
+            time.sleep(rest)
         self.sem.acquire()
         if self.gap:
             with self.lock:
@@ -76,7 +90,7 @@ def _slot(url: str) -> _Slot:
     with _host_lock:
         if host not in _host_slots:
             n, gap = HOST_LIMITS.get(host, (MAX_PER_HOST, 0.0))
-            _host_slots[host] = _Slot(n, gap)
+            _host_slots[host] = _Slot(host, n, gap)
         return _host_slots[host]
 
 
@@ -99,6 +113,16 @@ def _request(url: str, *, params: dict | None = None, body: dict | None = None,
     return urllib.request.Request(url, data=data, headers=h, method="POST" if data else "GET")
 
 
+def _refused(url: str, e: urllib.error.HTTPError) -> Blocked:
+    """403/429: pause that server (as long as it asks, else a minute) and report it."""
+    try:
+        wait = float(e.headers.get("Retry-After") or 60)
+    except (TypeError, ValueError):
+        wait = 60.0
+    _slot(url).pause(min(max(wait, 10.0), 600.0))
+    return Blocked(f"{urllib.parse.urlsplit(url).hostname} is limiting requests right now (HTTP {e.code})")
+
+
 def get_json(url: str, *, params: dict | None = None, body: dict | None = None,
              timeout: float = TIMEOUT) -> dict:
     try:
@@ -106,11 +130,16 @@ def get_json(url: str, *, params: dict | None = None, body: dict | None = None,
             return json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code in (403, 429):
-            raise Blocked(f"{urllib.parse.urlsplit(url).hostname} is limiting requests right now (HTTP {e.code})") from e
+            raise _refused(url, e) from e
         raise
 
 
 def fetch(url: str, *, timeout: float = 60) -> tuple[bytes, str]:
     """Return (content, content_type)."""
-    with _slot(url), urllib.request.urlopen(_request(url), timeout=timeout) as r:
-        return r.read(), r.headers.get("Content-Type", "application/octet-stream")
+    try:
+        with _slot(url), urllib.request.urlopen(_request(url), timeout=timeout) as r:
+            return r.read(), r.headers.get("Content-Type", "application/octet-stream")
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            raise _refused(url, e) from e
+        raise

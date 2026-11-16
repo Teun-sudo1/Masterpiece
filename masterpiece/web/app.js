@@ -323,10 +323,11 @@ function showErrors() {
   const notice = $("notice");
   notice.textContent = parts.join(" · ");
   notice.hidden = !parts.length;
-  const skipped = [...state.skipped].map(sourceName);
-  $("regionNote").textContent = skipped.length
-    ? `Not searched for ${state.regions.size > 1 ? "these regions" : "this region"}: ${skipped.join(", ")} (little or nothing from there).` : "";
-  $("regionNote").hidden = !skipped.length;
+  // say which museums have paintings from the chosen regions (short), not which ones don't
+  const searched = state.sources.filter((s) => s.enabled && !state.skipped.has(s.key)).map((s) => s.name);
+  $("regionNote").textContent = state.skipped.size
+    ? `From ${state.regions.size > 1 ? "these regions" : "here"}: ${searched.join(", ") || "none of the chosen museums"}` : "";
+  $("regionNote").hidden = !state.skipped.size;
 }
 
 function finishSearch(added, scanned) {
@@ -346,13 +347,48 @@ function finishSearch(added, scanned) {
 function setStatus(t) { $("status").textContent = t; }
 
 // ------------------------------------------------------------------ grid
+// Wikimedia makes rarely viewed thumbnails on request and allows about one a second, so its
+// pictures load through a small queue of their own (only the ones near the screen): they never
+// hold up the other museums' pictures, which load as usual.
+const SLOW_HOSTS = /^https:\/\/upload\.wikimedia\.org\//;
+const slowQueue = [];
+let slowBusy = 0;
+const slowSeen = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    slowSeen.unobserve(e.target);
+    slowQueue.push(e.target);
+  }
+  pumpSlow();
+}, { rootMargin: "400px" });
+
+function pumpSlow() {
+  while (slowBusy < 2 && slowQueue.length) {
+    const im = slowQueue.shift();
+    if (!im.isConnected) continue;
+    slowBusy++;
+    const done = () => { slowBusy--; pumpSlow(); };
+    im.addEventListener("load", done, { once: true });
+    im.addEventListener("error", done, { once: true });
+    im.src = im.dataset.src;
+  }
+}
+
+function thumbImg(a) {
+  const url = a.thumbUrl || a.previewUrl;
+  const im = el("img", { alt: a.title, decoding: "async", onerror: retryImage });
+  if (SLOW_HOSTS.test(url)) { im.dataset.src = img(url); slowSeen.observe(im); }
+  else { im.loading = "lazy"; im.src = img(url); }
+  return im;
+}
+
 function card(a) {
   const sel = state.selected.has(a.id);
   return el("article", { class: `card${sel ? " selected" : ""}`, "data-id": a.id },
     el("button", {
       type: "button", class: "thumb", title: "Preview",
       onclick: () => openLightbox(currentList().findIndex((x) => x.id === a.id)),
-    }, el("img", { src: img(a.thumbUrl || a.previewUrl), alt: a.title, loading: "lazy", decoding: "async" })),
+    }, thumbImg(a)),
     ...(state.saved.has(a.id) ? [savedBadge()] : []),
     el("button", { type: "button", class: "icon-btn pick", onclick: () => toggle(a) }),
     el("div", { class: "body" },
@@ -527,6 +563,15 @@ async function loadHighRes(id, url) {
 function step(d) {
   const n = state.lbIndex + d;
   if (n >= 0 && n < currentList().length) openLightbox(n);
+}
+
+// A picture the museum wouldn't send yet (it asked us to slow down) tries again later, twice.
+function retryImage(e) {
+  const im = e.target, n = Number(im.dataset.retry || 0);
+  if (n >= 2) return;
+  im.dataset.retry = String(n + 1);
+  const src = im.src.replace(/&r=\d+$/, "");
+  setTimeout(() => { if (im.isConnected) im.src = `${src}&r=${n + 1}`; }, n ? 60000 : 25000);
 }
 
 // ------------------------------------------------------------------ init

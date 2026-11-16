@@ -40,11 +40,13 @@ def main() -> int:
     srv = server.make_server(0)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
-        subprocess.run([EDGE, "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
-                        f"--user-data-dir={tmp / 'edge'}", f"--window-size={SIZE[0]},{SIZE[1]}",
-                        "--virtual-time-budget=45000", f"--screenshot={OUT}",
-                        f"http://127.0.0.1:{srv.server_address[1]}/"], check=True, timeout=180,
-                       capture_output=True)
+        # twice: the first pass fetches every picture (the server keeps them), the second photographs
+        for shot in (tmp / "warm-up.png", OUT):
+            subprocess.run([EDGE, "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
+                            f"--user-data-dir={tmp / 'edge'}", f"--window-size={SIZE[0]},{SIZE[1]}",
+                            "--virtual-time-budget=45000", f"--screenshot={shot}",
+                            f"http://127.0.0.1:{srv.server_address[1]}/"], check=True, timeout=180,
+                           capture_output=True)
     finally:
         srv.shutdown()
         srv.server_close()
