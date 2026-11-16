@@ -72,7 +72,8 @@ def _parse(release: dict) -> dict | None:
     return {
         "version": (release.get("tag_name") or "").lstrip("vV"),
         "name": release.get("name") or release.get("tag_name") or "",
-        "notes": (release.get("body") or "").strip()[:4000],
+        # notes are shown as plain text: drop the ``` lines of a Markdown code block
+        "notes": re.sub(r"(?m)^[ \t]*```\w*[ \t]*(\r?\n|$)", "", release.get("body") or "").strip()[:4000],
         "page": release.get("html_url") or "",
         "asset": setup["name"],
         "url": setup.get("browser_download_url") or "",

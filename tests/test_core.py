@@ -921,3 +921,12 @@ def test_wikidata_thumbs_and_local_search(monkeypatch):
     assert a.image_url.endswith("/3840px-Some_painting.jpg") and a.width == 3840 and a.height == 3072
     assert a.thumb_url.endswith("/500px-Some_painting.jpg")
     assert [x.maker for x in wikidata.search("", period="1850")] != []
+
+
+def test_release_notes_without_code_fences():
+    from masterpiece import update
+    setup = {"name": "Masterpiece-Setup-0.4.2.exe", "browser_download_url": "https://github.com/x.exe",
+             "size": 10, "digest": "sha256:" + "a" * 64}
+    r = update._parse({"tag_name": "v0.4.2", "body": "```\r\nNew look\r\n- Four tabs\r\n```", "draft": False,
+                       "prerelease": False, "html_url": "https://x", "assets": [setup]})
+    assert r["notes"] == "New look\r\n- Four tabs"
