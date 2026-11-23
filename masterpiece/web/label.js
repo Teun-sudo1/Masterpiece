@@ -7,10 +7,11 @@ const LABEL_OPTIONS = {
   text: [["full", "Title — Artist, year · Museum"], ["two", "Two lines"], ["artist", "Title — Artist, year"], ["title", "Title (year)"]],
   font: [["sans", "Sans"], ["serif", "Serif"]],
   size: [["s", "S"], ["m", "M"], ["l", "L"]],
+  where: [["all", "All screens"], ["main", "Main screen"], ["left", "Left screen"], ["right", "Right screen"]],
 };
 const PRESETS = [["0.5,0.93", "bottom centre"], ["0.5,0.5", "centre"], ["0.86,0.93", "bottom right"], ["0.5,0.07", "top centre"]];
 
-const labelDlg = { pos: { x: 0.5, y: 0.93 }, style: { look: "dark", font: "sans", size: "m", text: "full" },
+const labelDlg = { pos: { x: 0.5, y: 0.93 }, style: { look: "dark", font: "sans", size: "m", text: "full", where: "all" },
                    screens: [], sample: null, onDone: null };
 
 function labelLines(a, mode) {          // mirrors wallpaper.label_lines (with the painting's date)
@@ -21,6 +22,16 @@ function labelLines(a, mode) {          // mirrors wallpaper.label_lines (with t
   if (mode === "artist") return [j(" — ", a.title, by)];
   if (mode === "two") return [a.title, j(" · ", by, a.museum)];
   return [j(" · ", j(" — ", a.title, by), a.museum)];
+}
+
+// mirrors wallpaper.labelled_screens: which screens show the label
+function labelledScreens(scr, where) {
+  if (scr.length < 2 || !["main", "left", "right"].includes(where)) return new Set(scr);
+  let pick;
+  if (where === "main") pick = scr.find((m) => m.primary) || scr[0];
+  else if (where === "left") pick = scr.reduce((a, m) => (m.x < a.x || (m.x === a.x && m.y < a.y) ? m : a));
+  else pick = scr.reduce((a, m) => (m.x + m.width > a.x + a.width || (m.x + m.width === a.x + a.width && m.y < a.y) ? m : a));
+  return new Set([pick]);
 }
 
 function buildLabelDialog() {
@@ -34,7 +45,8 @@ function buildLabelDialog() {
       el("div", { class: "seg-group" }, el("span", { class: "lbl" }, "Look"), seg("look")),
       el("div", { class: "seg-group" }, el("span", { class: "lbl" }, "Text"), seg("text")),
       el("div", { class: "seg-group" }, el("span", { class: "lbl" }, "Font"), seg("font"),
-        el("span", { class: "lbl" }, "Size"), seg("size"))),
+        el("span", { class: "lbl" }, "Size"), seg("size")),
+      el("div", { class: "seg-group", id: "labelWhere" }, el("span", { class: "lbl" }, "Screens"), seg("where"))),
     el("div", { class: "screens-stage", id: "labelStage" }),
     el("div", { class: "dlg-actions" },
       el("span", { class: "presets" },
@@ -108,6 +120,8 @@ function openLabelDialog({ screens, sample, pos, style, onDone }) {
 function renderLabelStage() {
   const stage = $("labelStage");
   const scr = labelDlg.screens.length ? labelDlg.screens : [{ x: 0, y: 0, width: 1920, height: 1080, primary: true }];
+  $("labelWhere").hidden = scr.length < 2;                // only a choice with more than one screen
+  const withLabel = labelledScreens(scr, labelDlg.style.where);
   const x0 = Math.min(...scr.map((m) => m.x)), y0 = Math.min(...scr.map((m) => m.y));
   const W = Math.max(...scr.map((m) => m.x + m.width)) - x0, H = Math.max(...scr.map((m) => m.y + m.height)) - y0;
   const maxW = Math.min(700, window.innerWidth * 0.86), maxH = Math.min(360, window.innerHeight * 0.5);
@@ -123,6 +137,7 @@ function renderLabelStage() {
     const chip = el("span", { class: `chip-label look-${st.look} font-${st.font}${lines.length > 1 ? " two" : ""}` },
       ...lines.map((t, i) => el("span", { class: i ? "l2" : "l1" }, t)));
     chip.style.fontSize = `${Math.max(6, fontPx)}px`;
+    if (!withLabel.has(m)) chip.hidden = true;           // this screen shows no label
     const s = el("div", { class: "screen" },
       el("span", { class: "dim" }, `${fmt(m.width, m.height)}${m.primary ? " · main" : ""}`),
       el("span", { class: "guide" }), chip);

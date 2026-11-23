@@ -953,3 +953,80 @@ def test_a_server_that_says_too_many_requests_is_left_alone(monkeypatch):
         net.fetch(url.replace("X.jpg", "Y.jpg"))
     assert len(calls) == 1
     assert net._slot(url).paused_until > 0
+
+
+def test_label_only_on_the_chosen_screens(tmp_path, monkeypatch):
+    PIL = pytest.importorskip("PIL.Image")
+    from masterpiece import cache
+    mons = [{"id": "A", "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True},
+            {"id": "B", "x": -1080, "y": -429, "width": 1080, "height": 1920, "primary": False}]
+    assert wallpaper.labelled_screens(mons, "all") == {"A", "B"}
+    assert wallpaper.labelled_screens(mons, "main") == {"A"}
+    assert wallpaper.labelled_screens(mons, "left") == {"B"} and wallpaper.labelled_screens(mons, "right") == {"A"}
+    assert wallpaper.labelled_screens(mons[:1], "left") == {"A"}            # one screen: always labelled
+    assert wallpaper.label_style({"where": "left"})["where"] == "left"
+    assert wallpaper.label_style({"where": "upside"})["where"] == "all"
+
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    PIL.new("RGB", (1600, 900), "navy").save(folder / "aic-1.jpg")
+    PIL.new("RGB", (900, 1600), "olive").save(folder / "aic-2.jpg")
+    for n in ("aic-1.jpg", "aic-2.jpg"):
+        cache.kv().set(f"art:{n}", {"title": "A long title", "maker": "M", "museum": "X"})
+        cache.kv().set(f"labelled:{n}", False)
+    calls = []
+    _fake_screens(monkeypatch, calls)
+    plain = lambda path: len(PIL.open(path).convert("RGB").getcolors(1 << 16) or []) <= 4    # no text on it
+
+    wallpaper.show_next(folder, "each", label=True, style={"where": "left"})    # B is the left screen
+    _, mapping = calls[-1]
+    assert not plain(mapping["B"]) and plain(mapping["A"])
+    wallpaper.show_next(folder, "each", label=True, style={"where": "all"})
+    _, mapping = calls[-1]
+    assert not plain(mapping["A"]) and not plain(mapping["B"])
+
+    wallpaper.show_next(folder, "span", label=True, style={"where": "main"})   # spanned: only A's part
+    _, path = calls[-1]
+    with PIL.open(path) as im:                                                # A starts at x=1080, y=429
+        a_part, b_part = im.crop((1080, 429, 3000, 1509)), im.crop((0, 0, 1080, 1920))
+        assert len(a_part.getcolors(1 << 16) or []) > 4 and len(b_part.getcolors(1 << 16) or []) <= 4
+
+
+def test_a_museum_that_only_lets_browsers_in_is_left_alone(monkeypatch):
+    import io
+    from masterpiece import net, search
+    monkeypatch.setattr(net, "_host_slots", {})
+    calls = []
+
+    class Challenge(io.BytesIO):              # what Yale's CloudFront sends a non-browser
+        status = 202
+        headers = {"x-amzn-waf-action": "challenge"}
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def answer(req, timeout=None):
+        calls.append(req.full_url)
+        return Challenge(b"")
+
+    monkeypatch.setattr(net.urllib.request, "urlopen", answer)
+    url = "https://lux.collections.yale.edu/api/search/item"
+    with pytest.raises(net.Unavailable):
+        net.get_json(url, params={"q": "x"})
+    with pytest.raises(net.Unavailable):      # hours later only: no new request now
+        net.get_json(url, params={"q": "y"})
+    assert len(calls) == 1
+    r = search.search_all(["yale"])
+    assert r["errors"]["yale"].startswith("isn't available right now") and len(calls) == 1
+
+
+def test_cut_to_fit_keeps_the_chosen_part(tmp_path):
+    PIL = pytest.importorskip("PIL.Image")
+    src = tmp_path / "sky-and-ground.png"
+    im = PIL.new("RGB", (1000, 1000), (90, 140, 220))                 # sky above …
+    im.paste((60, 120, 40), (0, 500, 1000, 1000))                     # … ground below
+    im.save(src)
+    colours = lambda crop: {c for _, c in wallpaper.render(src, 1000, 400, crop=crop).getcolors(1 << 16)}
+    assert colours("bottom") == {(60, 120, 40)}                        # only ground: the sky is cut off
+    assert colours("top") == {(90, 140, 220)}
+    assert {(60, 120, 40), (90, 140, 220)} <= colours("middle")
+    assert wallpaper.crop_centering("sideways") == (0.5, 0.5)

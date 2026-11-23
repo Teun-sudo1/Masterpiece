@@ -3,6 +3,7 @@
 //   - first use: every step;
 //   - after an update: only the steps that are new since the version you had ("since");
 //   - Settings → "Take the tour" plays it all again.
+// A step with only `news` (no `text`) is shown after an update only.
 
 const TOUR_STEPS = [
   { sel: "#panel", since: "0.4.0", title: "Filters",
@@ -28,6 +29,10 @@ const TOUR_STEPS = [
   { sel: "#verBtn", since: "0.4.2", title: "Updates",
     text: "Your version. When an update is ready it shows here; afterwards this tour shows you just what's new. Settings → Take the tour plays it again.",
     news: "New: this tour. After every update it shows only what changed. Settings → Take the tour plays all of it again." },
+  { sel: '[data-tab="curator"]', since: "0.4.3", title: "The label, where you want it",
+    news: "New: show the label on all screens, only the main one, or only the left or right screen. Curator → Label → Style & position." },
+  { sel: '[data-tab="curator"]', since: "0.4.3", title: "Less sky, more painting",
+    news: "New: when a painting is cut to fit your screen, choose which part to keep: the middle, the bottom or the top. Curator → When a painting is cut to fit." },
 ];
 
 const vtuple = (v) => String(v || "0").split(".").map((n) => parseInt(n, 10) || 0);
@@ -48,7 +53,7 @@ async function maybeStartTour(settings) {
   tour.current = u.current;
   const seen = settings.tourVersion || "";
   if (replay || !seen) {
-    startTour(TOUR_STEPS, null);
+    startTour(TOUR_STEPS.filter((s) => s.text), null);
   } else if (newer(u.current, seen)) {
     const steps = TOUR_STEPS.filter((s) => newer(s.since, seen));
     if (steps.length) {

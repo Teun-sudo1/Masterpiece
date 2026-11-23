@@ -459,6 +459,7 @@ class Handler(BaseHTTPRequestHandler):
             time_of_day=bool(body.get("timeOfDay", s.get("timeOfDay"))),
             lock_screen=bool(s.get("lockScreen")),
             seasons=bool(s.get("seasons")),
+            crop=s.get("crop") or "middle",
             set_now=bool(body.get("setNow", True)),
         )
         self._json(result)

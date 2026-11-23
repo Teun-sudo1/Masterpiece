@@ -14,7 +14,7 @@ from itertools import zip_longest
 
 from . import cache, content, filters
 from .models import Artwork, Results
-from .net import Blocked
+from .net import Blocked, Unavailable
 from .sources import SOURCES
 
 TARGET_PER_SOURCE = 12     # stop once this many results passed the filters…
@@ -95,6 +95,8 @@ def search_all(source_keys: list[str], *, cursors: dict[str, int] | None = None,
             except Exception as e:  # one failing museum must not break the others
                 if isinstance(e, TimeoutError) or "timed out" in str(e):
                     errors[k] = "is responding very slowly right now. “Load more” tries again."
+                elif isinstance(e, Unavailable):
+                    errors[k] = "isn't available right now: its website only lets web browsers in. Masterpiece tries again later."
                 elif isinstance(e, Blocked):
                     errors[k] = "is limiting requests right now. Try again in a few minutes."
                 else:

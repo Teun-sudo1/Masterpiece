@@ -183,6 +183,7 @@ async function init() {
   setIntervalUi(s.interval || 60);
   $("screensRow").hidden = (options.screens || []).length < 2;
   $("screens").value = s.screens || "each";
+  $("crop").value = s.crop || "middle";
   $("label").checked = !!s.label;
   $("timeOfDay").checked = !!s.timeOfDay;
   $("seasons").checked = !!s.seasons;
@@ -226,6 +227,10 @@ async function init() {
   $("customUnit").addEventListener("change", onInterval);
   $("screens").addEventListener("change", async () => {
     await saveSettings({ screens: $("screens").value });
+    refreshLabel();
+  });
+  $("crop").addEventListener("change", async () => {       // re-renders what's on screen right away
+    await saveSettings({ crop: $("crop").value });
     refreshLabel();
   });
   $("label").addEventListener("change", async () => {

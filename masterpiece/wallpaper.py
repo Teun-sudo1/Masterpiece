@@ -97,13 +97,15 @@ LABEL_LOOKS = ("dark", "light", "plaque", "shadow", "subtle")
 LABEL_FONTS = ("sans", "serif")
 LABEL_SIZES = {"s": 72, "m": 55, "l": 40}          # screen's short side / this = font px
 LABEL_TEXTS = ("full", "two", "artist", "title")
-DEFAULT_LABEL_STYLE = {"look": "dark", "font": "sans", "size": "m", "text": "full"}
+LABEL_WHERE = ("all", "main", "left", "right")      # which screen(s) show the label
+DEFAULT_LABEL_STYLE = {"look": "dark", "font": "sans", "size": "m", "text": "full", "where": "all"}
 
 
 def label_style(value) -> dict:
     """Settings value -> a complete, valid style dict."""
     v = value if isinstance(value, dict) else {}
-    allowed = {"look": LABEL_LOOKS, "font": LABEL_FONTS, "size": tuple(LABEL_SIZES), "text": LABEL_TEXTS}
+    allowed = {"look": LABEL_LOOKS, "font": LABEL_FONTS, "size": tuple(LABEL_SIZES), "text": LABEL_TEXTS,
+               "where": LABEL_WHERE}
     return {k: (v.get(k) if v.get(k) in allowed[k] else DEFAULT_LABEL_STYLE[k]) for k in allowed}
 
 
@@ -120,6 +122,19 @@ def label_lines(a: Artwork | dict, mode: str = "full") -> list[str]:
     if mode == "two":
         return [title, " · ".join(x for x in (by, museum) if x)]
     return [" · ".join(x for x in (" — ".join(x for x in (title, by) if x), museum) if x)]
+
+
+def labelled_screens(mons: list[dict], where: str = "all") -> set:
+    """IDs of the screens that get a label: all, the main one, the leftmost or the rightmost."""
+    if len(mons) < 2 or where not in ("main", "left", "right"):
+        return {m.get("id") for m in mons}
+    if where == "main":
+        pick = next((m for m in mons if m.get("primary")), mons[0])
+    elif where == "left":
+        pick = min(mons, key=lambda m: (m["x"], m["y"]))
+    else:
+        pick = max(mons, key=lambda m: (m["x"] + m["width"], -m["y"]))
+    return {pick.get("id")}
 
 
 DEFAULT_LABEL_POS = (0.5, 0.93)   # centre of the label, as fractions of the screen: bottom-centre
@@ -240,15 +255,23 @@ def add_label(img: "Image.Image", text: str | list[str],
     return Image.alpha_composite(base, text_layer).convert("RGB")
 
 
+# When a painting is cut to fit a screen: which part to keep (horizontal, vertical centring)
+CROPS = {"middle": (0.5, 0.5), "bottom": (0.5, 1.0), "top": (0.5, 0.0)}
+
+
+def crop_centering(value) -> tuple[float, float]:
+    return CROPS.get(value, CROPS["middle"])
+
+
 def render(src: Path, w: int, h: int, text: str | list[str] | None = None,
            region: tuple[int, int, int, int] | None = None,
            pos: tuple[float, float] = DEFAULT_LABEL_POS,
-           style: dict | None = None) -> "Image.Image":
+           style: dict | None = None, crop: str = "middle") -> "Image.Image":
     """Crop & scale `src` to exactly w×h (like Windows' 'Fill'), then label it.
     Because we crop ourselves, the label always lands on the visible part."""
     with Image.open(src) as im:
         im.draft("RGB", (w, h))            # fast JPEG decode at reduced size when possible
-        out = ImageOps.fit(im.convert("RGB"), (w, h), Image.LANCZOS)
+        out = ImageOps.fit(im.convert("RGB"), (w, h), Image.LANCZOS, centering=crop_centering(crop))
     return add_label(out, text, region, pos, style) if text else out
 
 
@@ -548,7 +571,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               force: str | None = None, style: dict | None = None,
               favourites=None, time_of_day: bool = False,
               keep: dict | None = None, lock_screen: bool = False, seasons: bool = False,
-              record: bool = True) -> dict:
+              record: bool = True, crop: str = "middle") -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -579,10 +602,13 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
     main = next((m for m in mons if m.get("primary")), mons[0])
 
     # Work out what goes where: (key, width, height, label region)
+    where = labelled_screens(mons, label_style(style)["where"])
     if screens == "span" and len(mons) > 1 and lay.get("span"):
         x0 = min(m["x"] for m in mons)
         y0 = min(m["y"] for m in mons)
-        region = (main["x"] - x0, main["y"] - y0, main["x"] - x0 + main["width"], main["y"] - y0 + main["height"])
+        box = lambda m: (m["x"] - x0, m["y"] - y0, m["x"] - x0 + m["width"], m["y"] - y0 + m["height"])
+        region = box(main)                            # the main screen's part (also for the lock screen)
+        label_regions = [box(m) for m in sorted(mons, key=lambda m: not m.get("primary")) if m.get("id") in where]
         targets = [("span", lay["span"]["width"], lay["span"]["height"], region)]
     elif len(mons) > 1:
         # 'each' and 'same': a render per screen at its exact resolution, so the label always
@@ -638,9 +664,16 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
             paths[key] = p
             continue
         src, needs_label = sources[p]
-        text = label_lines(meta, label_style(style)["text"]) if (label and needs_label and meta) else None
+        on_this = key == "span" or key == "all" or key in where      # this screen shows the label
+        text = label_lines(meta, label_style(style)["text"]) if (label and needs_label and meta and on_this) else None
         out = current_dir() / f"{stamp}-{i}.jpg"
-        render(src, w, h, text, region, pos, style).save(out, "JPEG", quality=90)
+        if key == "span":                             # one picture across all screens: a label on each chosen one
+            im = render(src, w, h, None, region, pos, style, crop=crop)
+            for r in (label_regions if text else []):
+                im = add_label(im, text, r, pos, style)
+            im.save(out, "JPEG", quality=90)
+        else:
+            render(src, w, h, text, region, pos, style, crop=crop).save(out, "JPEG", quality=90)
         paths[key] = out
 
     backup.capture([current_dir(), folder, originals_dir()])   # remember your own wallpaper first
@@ -759,7 +792,8 @@ def _show_from_settings(s: dict | None = None, **kw) -> dict:
     return show_next(resolve_folder(s.get("folder")), s.get("screens", "each"), bool(s.get("label", True)),
                      pos=label_pos(s.get("labelPos")), style=label_style(s.get("labelStyle")),
                      favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")),
-                     lock_screen=bool(s.get("lockScreen")), seasons=bool(s.get("seasons")), **kw)
+                     lock_screen=bool(s.get("lockScreen")), seasons=bool(s.get("seasons")),
+                     crop=s.get("crop") or "middle", **kw)
 
 
 def relabel_folder(folder: Path, label: bool, pos=DEFAULT_LABEL_POS, style: dict | None = None) -> int:
@@ -944,7 +978,7 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
           mode: str, screens: str = "each", interval: int = 60, set_now: bool = True,
           pos: tuple[float, float] = DEFAULT_LABEL_POS, style: dict | None = None,
           favourites=None, time_of_day: bool = False, lock_screen: bool = False,
-          seasons: bool = False) -> dict:
+          seasons: bool = False, crop: str = "middle") -> dict:
     if mode == "daily":                    # settings from older versions
         mode, interval = "rotate", 1440
     interval = max(1, min(int(interval), 31 * 1440))
@@ -994,12 +1028,12 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
             fresh += [a["name"] for a in added]
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
                                          favourites=favourites, time_of_day=time_of_day,
-                                         lock_screen=lock_screen, seasons=seasons)
+                                         lock_screen=lock_screen, seasons=seasons, crop=crop)
         schedule.enable(interval)
     else:
         schedule.disable()
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
-                                         favourites=favourites, lock_screen=lock_screen, seasons=seasons)
+                                         favourites=favourites, lock_screen=lock_screen, seasons=seasons, crop=crop)
     result["rotation"] = schedule.status()
     result["backup"] = backup.has_backup()
     return result

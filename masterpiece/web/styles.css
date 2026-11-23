@@ -201,6 +201,7 @@ label { color: var(--muted); font-size: 13px; }
   margin-bottom: 14px; padding: 9px 13px; border-radius: var(--radius); font-size: 13px;
   border: 1px solid var(--danger); color: var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent);
 }
+.notice.soft { color: var(--muted); background: var(--panel); border-color: var(--line); }
 
 /* ---------- region map (inside the panel) */
 .map-wrap { position: relative; border-radius: 8px; overflow: hidden; margin-left: -10px; margin-right: -6px;

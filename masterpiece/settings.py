@@ -31,6 +31,7 @@ DEFAULTS: dict = {
     "mode": "rotate",             # "rotate" (my collection) | "curator" (the Curator adds new ones daily)
     "interval": 60,               # minutes between paintings (slideshow / rotate), 1 … 44640
     "screens": "each",            # multi-monitor: "each" | "same" | "span"
+    "crop": "middle",             # a painting cut to fit the screen keeps its "middle" | "bottom" | "top"
     "introSeen": False,
     "tourVersion": "",            # version whose tour was seen; after an update the tour shows only what's new
     "folder": "",                 # empty = default %USERPROFILE%\Pictures\Masterpiece

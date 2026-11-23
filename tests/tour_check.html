@@ -74,7 +74,7 @@
           for (const theme of ["dark", "light"]) {
             const win = await load(w, h, theme);
             const all = win.eval("TOUR_STEPS");
-            await play(win, `first use ${w}×${h} ${theme}`, all, null);
+            await play(win, `first use ${w}×${h} ${theme}`, all.filter((s) => s.text), null);
             await play(win, `after an update ${w}×${h} ${theme}`, all.filter((s) => s.news), "9.9.9");
           }
         }

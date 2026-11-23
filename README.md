@@ -35,7 +35,8 @@ Click a painting for its info card with the museum's description or facts.
   **My collection** only;
 - change every 10 minutes … once a day (or any interval), screens (a matching painting per screen,
   the same on all, or one spanned across all), the **label** (dark/light box, museum plaque, shadow,
-  subtle; sans or serif; three sizes; drag it anywhere on a preview of your screens), *match time of
+  subtle; sans or serif; three sizes; on all screens or only the main, left or right one; drag it
+  anywhere on a preview of your screens), *match time of
   day*, *follow the seasons*, and the **lock screen**;
 - **your taste**: sliders from *never* to *a lot* for subjects, periods, regions and museums, the
   artists you like (from your collection and favourites), and how often you want to be surprised.
@@ -128,7 +129,7 @@ Settings are stored in `%APPDATA%\Masterpiece\settings.json` (never in the repo)
 | [National Gallery of Art, Washington](https://www.nga.gov/open-access-images.html) | [open data on GitHub](https://github.com/NationalGalleryOfArt/opendata) (no search API: a local index of ≈2900 paintings ships with the app, `packaging/nga_index.py`) | none | CC0 (open-access images) |
 | [Wikidata](https://www.wikidata.org/) + [Wikimedia Commons](https://commons.wikimedia.org/) — Latin America, Oceania, Africa & Russia | SPARQL at build time (`packaging/wikidata_index.py`); a local index ships with the app | none | Painters who died before 1925; only images Commons marks as public domain / CC0 |
 | [J. Paul Getty Museum](https://www.getty.edu/projects/open-content-program/) | [Linked Art + SPARQL](https://data.getty.edu/museum/collection/docs/) | none | Getty Open Content (CC0), only works the manifest marks as public domain, made before 1930 |
-| [Yale Center for British Art](https://britishart.yale.edu/) & [Yale University Art Gallery](https://artgallery.yale.edu/) | [LUX](https://lux.collections.yale.edu/) (Linked Art) + IIIF manifests | none | Only works marked "Copyright Statement: Public domain" |
+| [Yale Center for British Art](https://britishart.yale.edu/) & [Yale University Art Gallery](https://artgallery.yale.edu/) | [LUX](https://lux.collections.yale.edu/) (Linked Art) + IIIF manifests | none | Only works marked "Copyright Statement: Public domain". Since November 2026 LUX only lets web browsers in; Masterpiece doesn't pretend to be one, so Yale is skipped (and retried every few hours) until that changes |
 
 The **Region** filter (Europe, Russia, North America, Latin America, Africa, East & South Asia,
 Middle East & Islamic world, Oceania) works across museums, and you can combine regions; the Met adds Chinese & Japanese paintings, Japanese woodblock prints

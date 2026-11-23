@@ -60,14 +60,18 @@ class _Slot:
         self.last = 0.0
         self.lock = threading.Lock()
         self.paused_until = 0.0
+        self.unavailable = False
 
-    def pause(self, seconds: float) -> None:
-        """The server said "too many requests": leave it alone for a while."""
+    def pause(self, seconds: float, unavailable: bool = False) -> None:
+        """The server said "too many requests" (or only lets browsers in): leave it alone for a while."""
         self.paused_until = max(self.paused_until, time.monotonic() + seconds)
+        self.unavailable = unavailable
 
     def __enter__(self):
         rest = self.paused_until - time.monotonic()
         if rest > MAX_WAIT:
+            if self.unavailable:
+                raise Unavailable(f"{self.host} only lets web browsers in right now")
             raise Blocked(f"{self.host} asked us to slow down; trying again in {round(rest)} s")
         if rest > 0:
             time.sleep(rest)
@@ -96,6 +100,14 @@ def _slot(url: str) -> _Slot:
 
 class Blocked(OSError):
     """The museum's bot protection refused us; back off instead of retrying."""
+
+
+class Unavailable(Blocked):
+    """The museum's website now asks every visitor to prove it is a web browser (a "challenge").
+    Masterpiece doesn't pretend to be one: it leaves the museum alone and tries again hours later."""
+
+
+UNAVAILABLE_PAUSE = 6 * 3600
 
 
 def _request(url: str, *, params: dict | None = None, body: dict | None = None,
@@ -127,7 +139,14 @@ def get_json(url: str, *, params: dict | None = None, body: dict | None = None,
              timeout: float = TIMEOUT) -> dict:
     try:
         with _slot(url), urllib.request.urlopen(_request(url, params=params, body=body), timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8"))
+            raw = r.read()
+            if r.headers.get("x-amzn-waf-action") or (r.status == 202 and not raw):
+                _slot(url).pause(UNAVAILABLE_PAUSE, unavailable=True)
+                raise Unavailable(f"{urllib.parse.urlsplit(url).hostname} only lets web browsers in right now")
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except ValueError:
+                raise OSError(f"{urllib.parse.urlsplit(url).hostname} sent something other than data") from None
     except urllib.error.HTTPError as e:
         if e.code in (403, 429):
             raise _refused(url, e) from e

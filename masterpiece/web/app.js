@@ -322,6 +322,8 @@ function showErrors() {
     `${sourceName(k)} ${/^(failed|is )/.test(e) ? e : `failed: ${e}`}`);
   const notice = $("notice");
   notice.textContent = parts.join(" · ");
+  // only "not available right now": a calm grey note, not a red error
+  notice.classList.toggle("soft", Object.values(state.errors).every((e) => /^isn't available/.test(e)));
   notice.hidden = !parts.length;
   // say which museums have paintings from the chosen regions (short), not which ones don't
   const searched = state.sources.filter((s) => s.enabled && !state.skipped.has(s.key)).map((s) => s.name);
