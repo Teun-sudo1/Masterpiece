@@ -40,7 +40,7 @@ function buildLabelDialog() {
     ...LABEL_OPTIONS[key].map(([v, t]) => el("button", { type: "button", "data-v": v, class: v === "serif" ? "serif" : "" }, t)));
   const dlg = el("dialog", { id: "labelDlg", class: "label-dlg" },
     el("h2", {}, "Label style & position"),
-    el("p", { class: "hint" }, "Pick a look, then drag the label on any screen. The same style and spot are used on every screen."),
+    el("p", { class: "hint" }, "Pick a look, then drag the label on a screen. The same style and spot are used on every screen that shows it."),
     el("div", { class: "label-styles", id: "labelStyles" },
       el("div", { class: "seg-group" }, el("span", { class: "lbl" }, "Look"), seg("look")),
       el("div", { class: "seg-group" }, el("span", { class: "lbl" }, "Text"), seg("text")),
@@ -124,7 +124,10 @@ function renderLabelStage() {
   const withLabel = labelledScreens(scr, labelDlg.style.where);
   const x0 = Math.min(...scr.map((m) => m.x)), y0 = Math.min(...scr.map((m) => m.y));
   const W = Math.max(...scr.map((m) => m.x + m.width)) - x0, H = Math.max(...scr.map((m) => m.y + m.height)) - y0;
-  const maxW = Math.min(700, window.innerWidth * 0.86), maxH = Math.min(360, window.innerHeight * 0.5);
+  // as big as the dialog allows (it is nearly as wide as the window), leaving room for the controls
+  const box = getComputedStyle(stage.parentElement);
+  const inner = stage.parentElement.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight) - 2;
+  const maxW = Math.max(300, inner), maxH = Math.max(200, Math.min(640, window.innerHeight - 380));
   const scale = Math.min(maxW / W, maxH / H);
   stage.style.width = `${W * scale}px`;
   stage.style.height = `${H * scale}px`;

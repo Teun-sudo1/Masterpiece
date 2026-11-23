@@ -404,7 +404,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 18px; curs
 
 /* ---------- label style & position dialog */
 dialog.label-dlg {
-  width: min(760px, 94vw); padding: 20px 22px 18px;
+  width: min(1400px, 96vw); padding: 20px 22px 18px;
   border: 1px solid var(--line-2); border-radius: 14px; background: var(--panel); color: var(--text);
 }
 .label-dlg h2 { margin: 0 0 4px; font: italic 700 20px/1.2 var(--sans); }
