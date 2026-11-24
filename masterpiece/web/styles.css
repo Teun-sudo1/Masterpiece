@@ -168,6 +168,8 @@ button.tag { cursor: pointer; }
 .now-tile .thumbs { margin-left: 0; gap: 5px; }
 .now-tile .thumb-btn { width: 32px; height: 30px; border-color: var(--line-2); }
 .now-tile .thumb-btn svg { width: 16px; height: 16px; }
+.now-tile .keep-btn { height: 30px; padding: 0 11px; border-color: var(--accent); color: var(--accent); }
+.now-tile .keep-btn:hover { background: var(--accent); color: var(--accent-ink); }
 .now-box .desk-next { margin-top: 18px; }
 .subject-chips { margin: 10px 0 4px; }
 .subject-chips .chip { padding: 5px 13px; border-radius: 99px; border: 1px solid var(--line-2); background: none;

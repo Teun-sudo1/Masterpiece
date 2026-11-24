@@ -62,7 +62,14 @@ function renderOnScreens() {
           btn("up", "up", "More like this", c.thumb === 1,
             () => rotation("thumb", { name: c.name, value: c.thumb === 1 ? 0 : 1 })),
           btn("down", "down", "Less like this: it goes, and the Curator looks for fewer like it", c.thumb === -1,
-            () => rotation("thumb", { name: c.name, value: -1 })))));
+            () => rotation("thumb", { name: c.name, value: -1 })),
+          c.fromCurator ? el("button", { type: "button", class: "small keep-btn",
+            title: "Chosen by the Curator. Keep it: it moves to My collection and stays.",
+            onclick: () => api("/api/collection", { action: "keep", name: c.name })
+              .then(() => { toast(`“${c.title}” is in My collection now.`); return loadItems(); })
+              .then(() => api("/api/rotation")).then(setRotation)
+              .then(() => { if (cur.sel === c.name) loadAbout(true); })
+              .catch((e) => toast(e.message)) }, "Keep") : null)));
   }));
 }
 
@@ -299,6 +306,7 @@ async function init() {
   $("seasons").checked = !!s.seasons;
   $("lockScreen").checked = !!s.lockScreen;
   $("curatorDaily").value = String([1, 2, 3, 5].includes(s.curatorDaily) ? s.curatorDaily : 3);
+  $("curatorMax").value = String([10, 20, 30, 50, 100].includes(s.curatorMax) ? s.curatorMax : 20);
   $("surprise").value = String(Number.isInteger(s.curatorSurprise) ? s.curatorSurprise : 2);
   $("surpriseVal").textContent = SURPRISE[Number($("surprise").value)];
   renderNow();
@@ -355,6 +363,7 @@ async function init() {
     tasteTimer = setTimeout(() => saveSettings({ curatorSurprise: Number($("surprise").value) }), 400);
   });
   $("curatorDaily").addEventListener("change", () => saveSettings({ curatorDaily: Number($("curatorDaily").value) }));
+  $("curatorMax").addEventListener("change", () => saveSettings({ curatorMax: Number($("curatorMax").value) }));
   $("askBtn").addEventListener("click", async () => {
     asking = true;
     renderAskBtn();

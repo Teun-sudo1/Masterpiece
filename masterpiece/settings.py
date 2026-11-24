@@ -50,6 +50,7 @@ DEFAULTS: dict = {
     "seasons": False,             # winter scenes in winter, blossom in spring, …
     "theme": "dark",              # the app's look: "dark" | "light" | "system" (as Windows)
     "curatorDaily": 3,            # Curator mode: new paintings it adds per day
+    "curatorMax": 20,             # keep at most this many in the Curator's collection (yours: maxFiles)
     # Curator taste: 0 never · 1 less · 2 normal (default) · 3 more · 4 a lot
     "curatorTaste": {"subjects": {}, "periods": {}, "regions": {}, "museums": {}},
     "curatorSurprise": 2,         # how often the Curator surprises you (0 never … 4 often)

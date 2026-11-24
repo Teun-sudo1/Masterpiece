@@ -1232,13 +1232,19 @@ def test_my_collection_mode_falls_back_when_empty(tmp_path):
     assert [p.name for p in wallpaper.rotating(folder, {"mode": "rotate"})] == ["aic-1.jpg"]
 
 
-def test_cleanup_removes_curator_picks_first(tmp_path):
-    from masterpiece import cache
+def test_cleanup_has_a_separate_limit_for_the_curator(tmp_path):
+    from masterpiece import cache, settings
     folder = tmp_path / "Masterpiece"
-    _files(folder, ["aic-1.jpg", "aic-2.jpg", "aic-3.jpg", "aic-4.jpg"])   # aic-1 oldest
-    cache.kv().set("curator:picks", {"aic-3.jpg": {}, "aic-4.jpg": {}})
-    removed = wallpaper.cleanup(folder, 2)
-    assert sorted(p.name for p in removed) == ["aic-3.jpg", "aic-4.jpg"]
+    _files(folder, ["aic-1.jpg", "aic-2.jpg", "aic-3.jpg", "aic-4.jpg", "aic-5.jpg"])   # aic-1 oldest
+    cache.kv().set("curator:picks", {"aic-3.jpg": {}, "aic-4.jpg": {}, "aic-5.jpg": {}})
+    assert wallpaper.cleanup(folder, 2) == []                     # 2 of yours, 3 of the Curator's (≤ 20)
+    removed = wallpaper.cleanup(folder, 1, curator_max=1)
+    assert sorted(p.name for p in removed) == ["aic-1.jpg", "aic-3.jpg", "aic-4.jpg"]
+    _files(folder, ["aic-6.jpg", "aic-7.jpg"])
+    cache.kv().set("curator:picks", {"aic-5.jpg": {}, "aic-6.jpg": {}, "aic-7.jpg": {}})
+    cache.kv().set("current:shown", [{"name": "aic-5.jpg", "screen": "x"}])
+    settings.save({"curatorMax": 1})                              # the setting; on screen stays
+    assert sorted(p.name for p in wallpaper.cleanup(folder, 10)) == ["aic-6.jpg"]
 
 
 def test_taste_ignores_curator_picks(tmp_path):

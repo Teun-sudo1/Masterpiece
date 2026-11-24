@@ -466,17 +466,26 @@ def saved_ids(folder: Path, mine: bool = False) -> list[str]:
     return ids
 
 
-def cleanup(folder: Path, max_files: int, keep_ids=()) -> list[Path]:
-    """Delete our oldest files beyond max_files (and their originals). Favourites
-    (keep_ids) are never deleted and don't count towards the maximum."""
+CURATOR_MAX = 20
+
+
+def cleanup(folder: Path, max_files: int, keep_ids=(), curator_max: int | None = None) -> list[Path]:
+    """Delete our oldest files beyond the limits (and their originals): at most max_files of
+    yours and at most curator_max in the Curator's collection (default: the setting).
+    Favourites (keep_ids) are never deleted and don't count; nor does the Curator's pick
+    that is on your screen right now."""
+    if curator_max is None:
+        from . import settings as _settings
+        curator_max = int(_settings.load().get("curatorMax") or CURATOR_MAX)
     removed = []
     keep = fav_names(keep_ids)
     files = [p for p in own_files(folder) if p.name not in keep]      # newest first
     picks = curator_picks()
-    over = len(files) - max(0, max_files)
-    # the Curator's oldest picks go first; yours only when the Curator's are all gone
-    oldest = [p for p in reversed(files) if p.name in picks] + [p for p in reversed(files) if p.name not in picks]
-    for p in oldest[:max(0, over)]:
+    on_screen = {c["name"] for c in currently_shown()}
+    mine = [p for p in files if p.name not in picks]
+    theirs = [p for p in files if p.name in picks and p.name not in on_screen]
+    victims = mine[max(0, max_files):] + theirs[max(0, curator_max):]
+    for p in victims:
         try:
             p.unlink()
             removed.append(p)

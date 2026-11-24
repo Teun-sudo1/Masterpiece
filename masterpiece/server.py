@@ -288,12 +288,13 @@ class Handler(BaseHTTPRequestHandler):
 
         from . import curator
         favs = set(s.get("favourites") or [])
+        picks = curator.picks()
 
         def card(name):
             if name not in cards:
                 c = wallpaper.painting_card(folder, name)
                 cards[name] = {**c, "focus": crops.get(name), "thumb": curator.thumb_of(s, name),
-                               "favourite": c["id"] in favs}
+                               "favourite": c["id"] in favs, "fromCurator": name in picks}
             return cards[name]
         return {
             "screens": [{k: m.get(k) for k in ("id", "x", "y", "width", "height", "primary")} for m in lay["monitors"]],
