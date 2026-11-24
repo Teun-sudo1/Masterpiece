@@ -30,8 +30,8 @@ Click a painting for its info card with the museum's description or facts.
 
 **Curator** — the control centre for your desktop:
 - **your desktop**, live: each screen as it is arranged, showing exactly what it shows. The part of a
-  painting that is cut off to fit is drawn faded around the screen ("cut off · 29%"); drag a painting
-  to choose the part yourself (remembered per painting), or show the **whole painting** with blurred
+  painting that is cut off to fit is drawn faded around the screen ("cut off · 29%"); the slider beside
+  each painting chooses the part you see (remembered per painting), or show the **whole painting** with blurred
   edges, a dark mat or a gold frame. Paintings that would look blurry say "a bit soft";
 - beside it the **layout** (a painting per screen, the same on all, or one across all; keep the
   middle, bottom or top) and the **label** (Auto picks dark or light text per painting; dark/light

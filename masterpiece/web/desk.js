@@ -8,7 +8,7 @@ const CROP_AT = { middle: [0.5, 0.5], bottom: [0.5, 1], top: [0.5, 0] };   // sa
 const SOFT_SCALE = 1.3;                                // same as wallpaper.SOFT_SCALE
 const AUTO_BRIGHT = 0.62;                              // same as wallpaper.AUTO_BRIGHT
 const DEFAULT_STYLE = { look: "dark", font: "sans", size: "m", text: "full", where: "all" };
-const desk = { drag: null, timer: null, live: {} };   // live: focus while dragging, per painting
+const desk = { drag: null, timer: null, live: {}, frozen: null };  // live: the part while sliding; frozen: layout
 
 function labelLines(a, mode) {                         // mirrors wallpaper.label_lines
   const j = (sep, ...xs) => xs.filter(Boolean).join(sep);
@@ -49,6 +49,15 @@ function placePainting(p, w, h) {
 const isSoft = (p, w, h) => (p.w && p.h) ? placePainting(p, w, h).scale > SOFT_SCALE : false;
 
 // ------------------------------------------------------------------ the preview
+// The preview is redrawn while you slide: pictures that already arrived show at once (no flicker).
+const shownPics = new Set();
+function pic(attrs) {
+  const im = el("img", attrs);
+  if (shownPics.has(attrs.src)) im.classList.add("loaded");
+  else im.addEventListener("load", () => shownPics.add(attrs.src), { once: true });
+  return im;
+}
+
 function deskTargets() {
   const r = cur.rot, mons = r.screens && r.screens.length ? r.screens
     : [{ id: null, x: 0, y: 0, width: 1920, height: 1080, primary: true }];
@@ -70,16 +79,22 @@ function renderDesk() {
   const { mons, x0, y0, W, H, targets } = deskTargets();
   const st = style(), withLabel = labelledScreens(mons, st.where);
   // room around the screens for the faded, cut-off parts
-  let padL = 0, padR = 0, padT = 0, padB = 0;
-  for (const t of targets) {
-    if (!t.p) continue;
-    const g = placePainting(t.p, t.box.w, t.box.h);
-    padL = Math.max(padL, -(t.box.x + g.x)); padT = Math.max(padT, -(t.box.y + g.y));
-    padR = Math.max(padR, t.box.x + g.x + g.dw - W); padB = Math.max(padB, t.box.y + g.y + g.dh - H);
+  let padL = 0, padR = 0, padT = 0, padB = 0, k;
+  if (desk.frozen) {
+    ({ padL, padR, padT, padB, k } = desk.frozen);
+  } else {
+    for (const t of targets) {
+      if (!t.p) continue;
+      const g = placePainting(t.p, t.box.w, t.box.h);
+      padL = Math.max(padL, -(t.box.x + g.x)); padT = Math.max(padT, -(t.box.y + g.y));
+      padR = Math.max(padR, t.box.x + g.x + g.dw - W); padB = Math.max(padB, t.box.y + g.y + g.dh - H);
+    }
+    const box = getComputedStyle(stage.parentElement);
+    const availW = stage.parentElement.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight);
+    const maxH = Math.max(220, Math.min(560, innerHeight - 330));
+    k = Math.min(availW / (W + padL + padR), maxH / (H + padT + padB));
   }
-  const box = getComputedStyle(stage.parentElement);
-  const availW = stage.parentElement.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight), maxH = Math.max(220, Math.min(560, innerHeight - 330));
-  const k = Math.min(availW / (W + padL + padR), maxH / (H + padT + padB));
+  desk.layout = { padL, padR, padT, padB, k };
   stage.style.width = `${(W + padL + padR) * k}px`;
   stage.style.height = `${(H + padT + padB) * k}px`;
   const ox = padL * k, oy = padT * k;
@@ -90,7 +105,7 @@ function renderDesk() {
     const g = placePainting(t.p, t.box.w, t.box.h);
     const left = ox + (t.box.x + g.x) * k, top = oy + (t.box.y + g.y) * k;
     if (!g.whole && g.cut > 0.01) {                     // the faded part that is cut off
-      kids.push(el("img", { class: "desk-ghost", src: thumbUrl(t.p.name, true), alt: "",
+      kids.push(pic({ class: "desk-ghost", src: thumbUrl(t.p.name, true), alt: "",
         style: `left:${left}px;top:${top}px;width:${g.dw * k}px;height:${g.dh * k}px` }));
     }
   });
@@ -107,13 +122,11 @@ function renderDesk() {
       if (g.whole) {
         const edges = cur.s.edges || "blur";
         win.classList.add(`edges-${edges}`);
-        if (edges === "blur") win.append(el("img", { class: "desk-blur", src: thumbUrl(t.p.name, true), alt: "" }));
-        win.append(el("img", { class: `desk-img${edges === "frame" ? " framed" : ""}`, src: thumbUrl(t.p.name, true), alt: t.p.title,
+        if (edges === "blur") win.append(pic({ class: "desk-blur", src: thumbUrl(t.p.name, true), alt: "" }));
+        win.append(pic({ class: `desk-img${edges === "frame" ? " framed" : ""}`, src: thumbUrl(t.p.name, true), alt: t.p.title,
           style: `left:${px}px;top:${py}px;width:${g.dw * k}px;height:${g.dh * k}px` }));
       } else {
-        win.classList.add("draggable");
-        win.title = "Drag up or down (or sideways) to choose the part you see";
-        win.append(el("img", { class: "desk-img", src: thumbUrl(t.p.name, true), alt: t.p.title, draggable: "false",
+        win.append(pic({ class: "desk-img", src: thumbUrl(t.p.name, true), alt: t.p.title, draggable: "false",
           style: `left:${px}px;top:${py}px;width:${g.dw * k}px;height:${g.dh * k}px` }));
       }
       if ($("label").checked && withLabel.has(m)) win.append(labelChip(t.p, m, k, st));
@@ -138,10 +151,52 @@ function renderDesk() {
     if (s > 16) kids.push(el("span", { class: "desk-cut", style: `left:${pos[0]}px;top:${pos[1]}px` },
       "cut off · ", el("b", {}, `${Math.round(g.cut * 100)}%`)));
   });
-  stage.replaceChildren(...kids);
+  if (!stage.firstElementChild) {
+    stage.append(el("div", { class: "desk-layer", id: "deskLayer" }), el("div", { class: "desk-sliders", id: "deskSliders" }));
+  }
+  $("deskLayer").replaceChildren(...kids);
+  if (!desk.sliding) $("deskSliders").replaceChildren(...cropSliders(targets, k, ox, oy));
   for (const c of stage.querySelectorAll(".chip-label")) placeChip(c);
   autoTones();
   renderCaptions(targets, mons, k, ox, (W + padL + padR) * k);
+}
+
+// A slider beside each painting that is cut off: it moves the part you see (top … bottom, or
+// left … right). The thumb sits where the visible part is.
+function cropSliders(targets, k, ox, oy) {
+  const out = [];
+  for (const t of targets) {
+    if (!t.p) continue;
+    const g = placePainting(t.p, t.box.w, t.box.h);
+    if (g.whole || g.cut < 0.01) continue;
+    const vertical = g.dh - t.box.h >= g.dw - t.box.w;
+    const bx = ox + t.box.x * k, by = oy + t.box.y * k, bw = t.box.w * k, bh = t.box.h * k;
+    const name = t.p.name;
+    const input = el("input", {
+      type: "range", min: "0", max: "1000", step: "1", class: `desk-slider ${vertical ? "v" : "h"}`,
+      value: String(Math.round((vertical ? g.cy : g.cx) * 1000)),
+      "aria-label": vertical ? `Which part of “${t.p.title}”: top to bottom` : `Which part of “${t.p.title}”: left to right`,
+      title: vertical ? "Slide to choose which part you see: top … bottom" : "Slide to choose which part you see: left … right",
+      style: vertical ? `left:${bx + bw - 24}px;top:${by + 12}px;height:${bh - 24}px`
+                      : `left:${bx + 12}px;top:${by + bh - 24}px;width:${bw - 24}px`,
+    });
+    const start = () => { desk.sliding = name; desk.frozen = desk.frozen || { ...desk.layout }; };
+    input.addEventListener("pointerdown", start);
+    input.addEventListener("keydown", start);
+    input.addEventListener("input", () => {
+      start();
+      const v = Number(input.value) / 1000, cur0 = placePainting(t.p, t.box.w, t.box.h);
+      desk.live[name] = vertical ? [cur0.cx, v] : [v, cur0.cy];
+      renderDesk();
+    });
+    input.addEventListener("change", () => {
+      desk.sliding = null;
+      desk.frozen = null;
+      if (desk.live[name]) saveCrop(name, desk.live[name].map((x) => Math.round(x * 1000) / 1000));
+    });
+    out.push(input);
+  }
+  return out;
 }
 
 function labelChip(p, m, k, st) {
@@ -223,16 +278,8 @@ function setupDeskDrag() {
   stage.addEventListener("pointerdown", (e) => {
     const chip = e.target.closest(".chip-label"), win = e.target.closest(".desk-screen");
     if (!win) return;
-    if (chip) {
-      desk.drag = { kind: "label", win };
-    } else if (win.classList.contains("draggable") && win.dataset.name) {
-      const t = deskTargets().targets.find((x) => x.p && x.p.name === win.dataset.name);
-      if (!t) return;
-      const g = placePainting(t.p, t.box.w, t.box.h);
-      const k = win.clientWidth / Number(win.dataset.w);      // preview px per screen px
-      desk.drag = { kind: "paint", name: t.p.name, sx: e.clientX, sy: e.clientY, cx: g.cx, cy: g.cy,
-                    rx: (g.dw - t.box.w) * k, ry: (g.dh - t.box.h) * k };
-    } else return;
+    if (!chip) return;
+    desk.drag = { kind: "label", win };
     stage.setPointerCapture(e.pointerId);
     stage.classList.add("dragging");
     e.preventDefault();
@@ -247,11 +294,6 @@ function setupDeskDrag() {
       if (Math.abs(x - 0.5) < 0.025) x = 0.5;           // gentle snap to the centre line
       cur.s.labelPos = { x: Math.round(x * 1000) / 1000, y: Math.round(y * 1000) / 1000 };
       for (const c of stage.querySelectorAll(".chip-label")) placeChip(c);
-    } else {
-      const cx = d.rx > 0.5 ? Math.min(1, Math.max(0, d.cx - (e.clientX - d.sx) / d.rx)) : d.cx;
-      const cy = d.ry > 0.5 ? Math.min(1, Math.max(0, d.cy - (e.clientY - d.sy) / d.ry)) : d.cy;
-      desk.live[d.name] = [cx, cy];
-      renderDesk();
     }
   });
   const end = () => {
@@ -262,8 +304,6 @@ function setupDeskDrag() {
     if (d.kind === "label") {
       saveSettings({ labelPos: cur.s.labelPos }).then(() => $("label").checked && refreshLabel());
       autoTones();
-    } else if (desk.live[d.name]) {
-      saveCrop(d.name, desk.live[d.name].map((v) => Math.round(v * 1000) / 1000));
     }
   };
   stage.addEventListener("pointerup", end);
@@ -303,7 +343,7 @@ function syncDeskControls() {
   $("labelOpts").classList.toggle("dim", !cur.s.label);
   $("cropNote").textContent = cropMode() === "whole"
     ? "Nothing is cut off; the empty edges are filled. Good for portraits and square paintings."
-    : "The faded part is cut off. Drag a painting to choose the part yourself: it keeps your choice.";
+    : "The faded part is cut off. Use the slider beside a painting to choose the part yourself: it keeps your choice.";
 }
 
 function changed(updates, now = false) {               // save, then show it on the desktop too

@@ -54,6 +54,19 @@ function icon(name, extra = "") {
 }
 
 let toastTimer;
+
+// Pictures fade in once they are there (CSS shows a sheen until then). One that keeps failing
+// says so calmly; pictures that retry by themselves (data-retry-able) only after their last try.
+document.addEventListener("load", (e) => {
+  if (e.target.tagName === "IMG") e.target.classList.add("loaded");
+}, true);
+document.addEventListener("error", (e) => {
+  const im = e.target;
+  if (im.tagName !== "IMG" || !im.getAttribute("src")) return;
+  if (im.hasAttribute("data-retry-able") && Number(im.dataset.retry || 0) < 2) return;
+  const box = im.closest(".thumb");
+  if (box) box.classList.add("failed");
+}, true);
 function toast(msg, ms = 5000) {
   let t = $("toast");
   if (!t) document.body.append(t = el("div", { id: "toast", class: "toast", role: "status" }));

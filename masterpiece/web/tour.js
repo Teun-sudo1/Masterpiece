@@ -34,9 +34,11 @@ const TOUR_STEPS = [
   { sel: '[data-tab="curator"]', since: "0.4.3", title: "Less sky, more painting",
     news: "New: when a painting is cut to fit your screen, choose which part to keep: the middle, the bottom or the top. Curator → Your desktop → Cut to fit." },
   { sel: '[data-tab="curator"]', since: "0.5.0", title: "Your desktop, live",
-    news: "New on the Curator tab: a live preview of your screens. See what is cut off, drag a painting to choose the part, or show the whole painting with blurred edges, a mat or a frame." },
+    news: "New on the Curator tab: a live preview of your screens. See what is cut off, slide to choose the part you see, or show the whole painting with blurred edges, a mat or a frame." },
   { sel: '[data-tab="curator"]', since: "0.5.0", title: "Coming next",
     news: "New: see which paintings come next, drag them into another order or skip one. A painting that would look blurry on your screen says so. And the label can now pick dark or light text by itself (Auto)." },
+  { sel: '[data-tab="curator"]', since: "0.5.1", title: "A slider for the part you see",
+    news: "New: on the Curator tab, the slider beside each painting chooses the part you see (top … bottom). And pictures that are still loading now show a soft moving sheen." },
 ];
 
 const vtuple = (v) => String(v || "0").split(".").map((n) => parseInt(n, 10) || 0);

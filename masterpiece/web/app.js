@@ -319,7 +319,7 @@ function showPending(reset) {
 
 function showErrors() {
   const parts = Object.entries(state.errors).map(([k, e]) =>
-    `${sourceName(k)} ${/^(failed|is )/.test(e) ? e : `failed: ${e}`}`);
+    `${sourceName(k)} ${/^(failed|is |isn't )/.test(e) ? e : `failed: ${e}`}`);
   const notice = $("notice");
   notice.textContent = parts.join(" · ");
   // only "not available right now": a calm grey note, not a red error
@@ -378,7 +378,7 @@ function pumpSlow() {
 
 function thumbImg(a) {
   const url = a.thumbUrl || a.previewUrl;
-  const im = el("img", { alt: a.title, decoding: "async", onerror: retryImage });
+  const im = el("img", { alt: a.title, decoding: "async", onerror: retryImage, "data-retry-able": "" });
   if (SLOW_HOSTS.test(url)) { im.dataset.src = img(url); slowSeen.observe(im); }
   else { im.loading = "lazy"; im.src = img(url); }
   return im;
