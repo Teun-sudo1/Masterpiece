@@ -88,7 +88,7 @@ class Handler(BaseHTTPRequestHandler):
                     lay = monitors.layout()
                     return self._json({
                         **content.describe(),
-                        "screens": [{k: m[k] for k in ("x", "y", "width", "height", "primary")}
+                        "screens": [{k: m.get(k) for k in ("id", "x", "y", "width", "height", "primary")}
                                     for m in lay["monitors"]],
                         "span": lay["span"],
                     })
@@ -265,7 +265,26 @@ class Handler(BaseHTTPRequestHandler):
                 "shown": wallpaper.shown_summary(),
                 "hasPrevious": len(cache.kv().get("rotation:history", 1e12) or []) > 1,
                 "curatorLatest": curator.latest(), "curatorLast": cache.kv().get("curator:last", 1e12) or "",
-                "curatorBusy": bool(cache.kv().get("curator:running", curator.RUN_GUARD))}
+                "curatorBusy": bool(cache.kv().get("curator:running", curator.RUN_GUARD)),
+                **self._desktop(s, folder)}
+
+    def _desktop(self, s: dict, folder) -> dict:
+        """For the "Your desktop" preview: the screens, what each one shows (with the painting's
+        real size and your own crop) and what comes next."""
+        lay = monitors.layout()
+        crops = s.get("crops") or {}
+        cards = {}
+
+        def card(name):
+            if name not in cards:
+                cards[name] = {**wallpaper.painting_card(folder, name), "focus": crops.get(name)}
+            return cards[name]
+        return {
+            "screens": [{k: m.get(k) for k in ("id", "x", "y", "width", "height", "primary")} for m in lay["monitors"]],
+            "onScreens": [{"key": c.get("key"), "screen": c.get("screen"), **card(c["name"])}
+                          for c in wallpaper.currently_shown() if (folder / c["name"]).exists()],
+            "upcoming": [card(n) for n in wallpaper.upcoming(folder, s)],
+        }
 
     def _rotation(self, action: str | None, name: str | None = None, body: dict | None = None):
         s = settings.load()
@@ -310,6 +329,21 @@ class Handler(BaseHTTPRequestHandler):
             shown = wallpaper.show_from_settings(s)
             return self._json({**self._rotation_status(), "wallpapers": shown,
                                "rotation": schedule.status()})
+        if action == "crop":                     # your own crop for one painting (None = the setting)
+            crops = dict(s.get("crops") or {})
+            focus = body.get("focus")
+            if isinstance(focus, list) and len(focus) == 2:
+                crops[name] = [round(min(1.0, max(0.0, float(v))), 3) for v in focus]
+            else:
+                crops.pop(name, None)
+            s = settings.save({"crops": crops})
+            return self._json({**wallpaper.refresh_labels(s), **self._rotation_status()})
+        if action == "queue":                    # "Coming next" dragged into a new order
+            wallpaper.reorder_upcoming([str(n) for n in body.get("order") or []])
+            return self._json(self._rotation_status())
+        if action == "skipNext":                 # × on a painting in "Coming next"
+            wallpaper.skip_upcoming(name)
+            return self._json(self._rotation_status())
         if action == "refresh":                  # label changed: re-render what's on screen now
             return self._json(wallpaper.refresh_labels(s))
         if action == "skip":

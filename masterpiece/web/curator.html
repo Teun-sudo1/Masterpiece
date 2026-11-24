@@ -20,9 +20,57 @@
     <button type="button" class="ver" id="verBtn" title="Check for updates"></button>
   </header>
   <main class="page curator">
-    <!-- What's on your desktop -->
-    <section class="now-card" id="nowCard">
-      <div class="now-items" id="nowItems"></div>
+    <!-- Your desktop: what each screen shows, exactly as it looks, with the layout and label settings -->
+    <section class="desk" id="desk">
+      <div class="desk-main">
+        <h3>Your desktop</h3>
+        <p class="hint">Exactly what your screens show. The faded part is cut off: drag a painting to choose the part yourself. Drag the label to move it.</p>
+        <div class="desk-stage" id="deskStage"></div>
+        <div class="desk-caps" id="deskCaps"></div>
+        <div class="desk-foot" id="labelPresets">
+          <span>Label:</span>
+          <button type="button" class="link" data-pos="0.5,0.93">bottom centre</button>
+          <button type="button" class="link" data-pos="0.5,0.5">centre</button>
+          <button type="button" class="link" data-pos="0.86,0.93">bottom right</button>
+          <button type="button" class="link" data-pos="0.5,0.07">top centre</button>
+        </div>
+        <div class="desk-next" id="deskNext" hidden>
+          <div class="desk-next-head"><b>Coming next</b><span>Drag to change the order · × skips it</span></div>
+          <div class="next-row" id="nextRow"></div>
+        </div>
+      </div>
+      <div class="desk-side">
+        <div class="grp">
+          <h3>Layout</h3>
+          <div class="ctl" id="rowScreens"><span>Screens</span>
+            <span class="seg" id="segScreens" role="radiogroup"><button type="button" role="radio" data-v="each">A painting per screen</button><button type="button" role="radio" data-v="same">Same on all</button><button type="button" role="radio" data-v="span">Across all</button></span></div>
+          <div class="ctl"><span>Cut to fit</span>
+            <span class="seg" id="segCrop" role="radiogroup"><button type="button" role="radio" data-v="middle">Middle</button><button type="button" role="radio" data-v="bottom">Bottom</button><button type="button" role="radio" data-v="top">Top</button><button type="button" role="radio" data-v="whole">Whole painting</button></span></div>
+          <div class="ctl" id="rowEdges"><span>Edges</span>
+            <span class="seg" id="segEdges" role="radiogroup"><button type="button" role="radio" data-v="blur">Blurred</button><button type="button" role="radio" data-v="mat">Dark mat</button><button type="button" role="radio" data-v="frame">Gold frame</button></span></div>
+          <p class="note" id="cropNote"></p>
+        </div>
+        <div class="grp">
+          <div class="grp-head"><h3>Label</h3><label class="switch"><input type="checkbox" id="label" aria-label="Label"><span></span></label></div>
+          <div id="labelOpts" class="label-opts">
+            <div class="ctl" id="rowWhere"><span>On</span>
+              <span class="seg" id="segWhere" role="radiogroup"><button type="button" role="radio" data-v="all">All screens</button><button type="button" role="radio" data-v="main">Main</button><button type="button" role="radio" data-v="left">Left</button><button type="button" role="radio" data-v="right">Right</button></span></div>
+            <div class="ctl"><span>Look</span>
+              <span class="seg" id="segLook" role="radiogroup"><button type="button" role="radio" data-v="auto">Auto</button><button type="button" role="radio" data-v="dark">Dark</button><button type="button" role="radio" data-v="light">Light</button><button type="button" role="radio" data-v="plaque">Plaque</button><button type="button" role="radio" data-v="shadow">Shadow</button><button type="button" role="radio" data-v="subtle">Subtle</button></span></div>
+            <p class="note">Auto: dark or light text per painting, so it is always readable.</p>
+            <div class="ctl"><span>Text</span>
+              <select id="labelText" aria-label="Text">
+                <option value="full">Title — Artist, year · Museum</option>
+                <option value="two">Two lines</option>
+                <option value="artist">Title — Artist, year</option>
+                <option value="title">Title (year)</option>
+              </select></div>
+            <div class="ctl"><span>Font &amp; size</span>
+              <span class="ctl-pair"><span class="seg" id="segFont" role="radiogroup"><button type="button" role="radio" data-v="sans">Sans</button><button type="button" role="radio" data-v="serif"><span class="serif">Serif</span></button></span>
+                <span class="seg" id="segSize" role="radiogroup"><button type="button" role="radio" data-v="s">S</button><button type="button" role="radio" data-v="m">M</button><button type="button" role="radio" data-v="l">L</button></span></span></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <div class="curator-cols">
@@ -50,27 +98,6 @@
                 <option value="60">hours</option><option value="1440">days</option></select>
             </span>
           </span>
-        </div>
-        <div class="row" id="screensRow" hidden>
-          <div class="what"><b>Screens</b></div>
-          <select id="screens">
-            <option value="each">A matching painting per screen</option>
-            <option value="same">The same painting on all</option>
-            <option value="span">One painting across all</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="what"><b>When a painting is cut to fit</b><span>Most paintings don't have your screen's shape, so a strip is cut off. Keep the bottom to lose sky rather than ground.</span></div>
-          <select id="crop">
-            <option value="middle">Keep the middle</option>
-            <option value="bottom">Keep the bottom</option>
-            <option value="top">Keep the top</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="what"><b>Label</b><span>Title, artist and museum on the painting.</span></div>
-          <span class="row-end"><button type="button" class="link" id="labelBtn">Style &amp; position…</button>
-            <label class="switch"><input type="checkbox" id="label"><span></span></label></span>
         </div>
         <div class="row">
           <div class="what"><b>Match time of day</b><span>Brighter by day, darker in the evening.</span></div>
@@ -143,7 +170,7 @@
     </div>
   </footer>
   <script src="shell.js"></script>
-  <script src="label.js"></script>
+  <script src="desk.js"></script>
   <script src="curator.js"></script>
 </body>
 </html>

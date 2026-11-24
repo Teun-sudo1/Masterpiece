@@ -1030,3 +1030,59 @@ def test_cut_to_fit_keeps_the_chosen_part(tmp_path):
     assert colours("top") == {(90, 140, 220)}
     assert {(60, 120, 40), (90, 140, 220)} <= colours("middle")
     assert wallpaper.crop_centering("sideways") == (0.5, 0.5)
+
+
+def test_whole_painting_your_own_crop_and_soft(tmp_path):
+    PIL = pytest.importorskip("PIL.Image")
+    src = tmp_path / "square.png"
+    PIL.new("RGB", (1000, 1000), (200, 30, 30)).save(src)
+    for edges in ("blur", "mat", "frame"):                         # nothing cut off: the edges are filled
+        im = wallpaper.render(src, 1600, 900, crop="whole", edges=edges)
+        assert im.size == (1600, 900) and im.getpixel((800, 450)) == (200, 30, 30)
+        assert im.getpixel((5, 450)) != (200, 30, 30)                # left edge: not the painting
+    sky = tmp_path / "sky.png"                                       # sky above, ground below
+    im = PIL.new("RGB", (1000, 1000), (90, 140, 220)); im.paste((60, 120, 40), (0, 500, 1000, 1000)); im.save(sky)
+    top = wallpaper.render(sky, 1000, 400, crop="bottom", focus=[0.5, 0.0])   # your crop wins over the setting
+    assert {c for _, c in top.getcolors(1 << 16)} == {(90, 140, 220)}
+    assert wallpaper.is_soft(1000, 800, 1920, 1080) and not wallpaper.is_soft(3000, 2000, 1920, 1080)
+    assert not wallpaper.is_soft(1600, 1400, 1920, 1080, "whole")    # whole: only enlarged to its height
+
+
+def test_auto_label_turns_dark_on_a_light_painting():
+    PIL = pytest.importorskip("PIL.Image")
+    light = PIL.new("RGB", (1600, 900), (245, 240, 230))
+    dark = PIL.new("RGB", (1600, 900), (20, 20, 25))
+    st = {"look": "auto", "size": "l"}
+    on_light = wallpaper.add_label(light, "A title — Someone, 1880", style=st)
+    on_dark = wallpaper.add_label(dark, "A title — Someone, 1880", style=st)
+    lum = lambda im: min(sum(c[:3]) / 3 for _, c in im.getcolors(1 << 18))
+    assert lum(on_light) < 80                                        # dark text on a light painting
+    assert max(sum(c[:3]) / 3 for _, c in on_dark.getcolors(1 << 18)) > 200   # light text on a dark one
+
+
+def test_coming_next_is_planned_followed_reordered_and_skipped(tmp_path, monkeypatch):
+    PIL = pytest.importorskip("PIL.Image")
+    from masterpiece import cache
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    for n in range(6):
+        PIL.new("RGB", (1600, 900), (40 * n, 40, 40)).save(folder / f"aic-{n}.jpg")
+        cache.kv().set(f"art:aic-{n}.jpg", {"title": f"P{n}", "maker": "M", "museum": "X"})
+        cache.kv().set(f"labelled:aic-{n}.jpg", False)
+    calls = []
+    _fake_screens(monkeypatch, calls)
+    lay = {"monitors": [{"id": "A", "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True}], "span": None}
+    from masterpiece import monitors
+    monkeypatch.setattr(monitors, "layout", lambda: lay)
+    s = {"screens": "each", "folder": str(folder)}
+    nxt = wallpaper.upcoming(folder, s)
+    assert len(nxt) == 3 and len(set(nxt)) == 3 and wallpaper.upcoming(folder, s) == nxt   # stable
+    wallpaper.reorder_upcoming([nxt[2], nxt[0], nxt[1]])
+    assert wallpaper.upcoming(folder, s)[:3] == [nxt[2], nxt[0], nxt[1]]
+    wallpaper.skip_upcoming(nxt[2])
+    after = wallpaper.upcoming(folder, s)
+    assert nxt[2] not in after and after[:2] == [nxt[0], nxt[1]]
+    shown = wallpaper.show_next(folder, "each", label=False, prefer=after)    # the first in line comes next
+    assert list(shown.values()) == [f"P{after[0][4]}"]
+    card = wallpaper.painting_card(folder, after[0])
+    assert card["w"] == 1600 and card["h"] == 900 and card["title"].startswith("P")

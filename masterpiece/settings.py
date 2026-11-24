@@ -31,7 +31,9 @@ DEFAULTS: dict = {
     "mode": "rotate",             # "rotate" (my collection) | "curator" (the Curator adds new ones daily)
     "interval": 60,               # minutes between paintings (slideshow / rotate), 1 … 44640
     "screens": "each",            # multi-monitor: "each" | "same" | "span"
-    "crop": "middle",             # a painting cut to fit the screen keeps its "middle" | "bottom" | "top"
+    "crop": "middle",             # a painting cut to fit keeps its "middle" | "bottom" | "top", or "whole"
+    "edges": "blur",              # "whole": the empty edges are "blur" | "mat" | "frame"
+    "crops": {},                  # your own crop per painting: {file name: [x, y]} (0..1, dragged in the preview)
     "introSeen": False,
     "tourVersion": "",            # version whose tour was seen; after an update the tour shows only what's new
     "folder": "",                 # empty = default %USERPROFILE%\Pictures\Masterpiece

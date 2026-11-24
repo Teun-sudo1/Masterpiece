@@ -1,5 +1,5 @@
 "use strict";
-// The Curator tab: what's on your desktop, how it changes, and your taste.
+// The Curator tab: what's on your desktop (desk.js), how it changes, and your taste.
 
 const cur = { s: {}, rot: {}, options: {}, sources: [], items: [], group: "subjects" };
 const PRESET_INTERVALS = [10, 30, 60, 180, 1440];
@@ -15,25 +15,8 @@ async function saveSettings(updates) {
 
 // ------------------------------------------------------------------ now on your screens
 function renderNow() {
-  const r = cur.rot;
-  const shown = r.shown || [];
-  const items = Object.fromEntries(cur.items.map((i) => [i.name, i]));
-  $("nowItems").replaceChildren(...(shown.length ? shown : [null]).map((c) => {
-    if (!c) {
-      return el("div", { class: "now-empty" },
-        el("b", {}, r.count ? "Nothing from Masterpiece on your desktop yet." : "Your collection is still empty."),
-        el("span", {}, r.count ? "Press Start to begin." : "Let the Curator choose, or add paintings from Search art."));
-    }
-    const it = items[c.name] || {};
-    return el("a", { class: "now-item", href: `painting.html?name=${encodeURIComponent(c.name)}`, title: "About this painting" },
-      el("img", { src: thumbUrl(c.name, true), alt: c.title }),
-      el("div", { class: "now-text" },
-        el("span", { class: "now-screen" }, c.screen),
-        el("b", {}, c.title),
-        el("span", {}, [c.maker || it.maker, it.year].filter(Boolean).join(", ")),
-        it.curator ? el("span", { class: "now-reason" }, icon("sparkle"), it.curator) : null));
-  }));
-
+  renderDesk();
+  renderUpcoming();
   renderAskBtn();
 }
 
@@ -95,6 +78,7 @@ function renderSource() {
 async function refreshLabel() {
   try {
     await api("/api/rotation", { action: "refresh" });
+    setRotation(await api("/api/rotation"));
   } catch (e) { toast(e.message); }
 }
 
@@ -181,10 +165,7 @@ async function init() {
   await loadItems();
 
   setIntervalUi(s.interval || 60);
-  $("screensRow").hidden = (options.screens || []).length < 2;
-  $("screens").value = s.screens || "each";
-  $("crop").value = s.crop || "middle";
-  $("label").checked = !!s.label;
+  setupDesk();
   $("timeOfDay").checked = !!s.timeOfDay;
   $("seasons").checked = !!s.seasons;
   $("lockScreen").checked = !!s.lockScreen;
@@ -225,31 +206,6 @@ async function init() {
   });
   $("customN").addEventListener("change", onInterval);
   $("customUnit").addEventListener("change", onInterval);
-  $("screens").addEventListener("change", async () => {
-    await saveSettings({ screens: $("screens").value });
-    refreshLabel();
-  });
-  $("crop").addEventListener("change", async () => {       // re-renders what's on screen right away
-    await saveSettings({ crop: $("crop").value });
-    refreshLabel();
-  });
-  $("label").addEventListener("change", async () => {
-    await saveSettings({ label: $("label").checked });
-    refreshLabel();
-  });
-  $("labelBtn").addEventListener("click", () => {
-    const first = (cur.rot.shown || [])[0];
-    const it = first ? cur.items.find((i) => i.name === first.name) : cur.items[0];
-    openLabelDialog({
-      screens: options.screens,
-      sample: it ? { title: it.title, maker: it.maker, year: it.year, museum: it.museum, thumb: thumbUrl(it.name, true) } : null,
-      pos: cur.s.labelPos, style: cur.s.labelStyle,
-      onDone: async (pos, style) => {
-        await saveSettings({ labelPos: pos, labelStyle: style });
-        if ($("label").checked) refreshLabel();
-      },
-    });
-  });
   $("timeOfDay").addEventListener("change", (e) => saveSettings({ timeOfDay: e.target.checked }));
   $("seasons").addEventListener("change", (e) => saveSettings({ seasons: e.target.checked }));
   $("lockScreen").addEventListener("change", async (e) => {

@@ -93,7 +93,7 @@ def _font(size: int, family: str = "sans", role: str = "body"):
 
 
 # Label style: look, font family, size and which text to show
-LABEL_LOOKS = ("dark", "light", "plaque", "shadow", "subtle")
+LABEL_LOOKS = ("auto", "dark", "light", "plaque", "shadow", "subtle")   # auto: dark or light text per painting
 LABEL_FONTS = ("sans", "serif")
 LABEL_SIZES = {"s": 72, "m": 55, "l": 40}          # screen's short side / this = font px
 LABEL_TEXTS = ("full", "two", "artist", "title")
@@ -165,7 +165,9 @@ _LOOKS = {
     "plaque": ((240, 234, 221, 240), (176, 160, 128, 255), (34, 28, 20, 255), (96, 86, 70, 255)),
     "shadow": (None, None, (255, 255, 255, 240), (255, 255, 255, 205)),
     "subtle": (None, None, (255, 255, 255, 180), (255, 255, 255, 150)),
+    "auto":   (None, None, (255, 255, 255, 240), (255, 255, 255, 205)),     # made dark on light paintings
 }
+AUTO_BRIGHT = 0.62          # "auto": above this brightness (0..1) under the label, the text turns dark
 
 
 def _fit_line(draw, text: str, font, max_w: int) -> str:
@@ -216,6 +218,12 @@ def add_label(img: "Image.Image", text: str | list[str],
     x0 = int(min(max(cx - bw / 2, rx0 + margin), rx1 - margin - bw))
     y0 = int(min(max(cy - bh / 2, ry0 + margin), ry1 - margin - bh))
     x1, y1 = x0 + bw, y0 + bh
+    glow = (0, 0, 0)                              # the soft shadow behind text without a box
+    if st["look"] == "auto":                      # light spot under the label: dark text, light glow
+        under = ImageStat.Stat(img.crop((x0, y0, x1, y1)).convert("L")).mean[0] / 255
+        if under > AUTO_BRIGHT:
+            inks = [(22, 20, 18, 240)] + [(48, 44, 40, 225)] * (len(lines) - 1)
+            glow = (255, 255, 255)
     # Text aligns with the side of the screen it is on (looks tidy without a box, too)
     align = "left" if pos[0] < 0.34 else "right" if pos[0] > 0.66 else "centre"
 
@@ -245,33 +253,76 @@ def add_label(img: "Image.Image", text: str | list[str],
     if not fill:                                  # no box: a soft shadow keeps the text readable
         shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
         sd = ImageDraw.Draw(shadow)
-        alpha = 170 if st["look"] == "shadow" else 110
+        alpha = 170 if st["look"] in ("shadow", "auto") else 110
         off = max(1, size // 14)
         for x, yb, t, f in places:
-            sd.text((x, yb + off), t, font=f, anchor="ls", fill=(0, 0, 0, alpha))
+            sd.text((x, yb + off), t, font=f, anchor="ls", fill=(*glow, alpha))
         base = Image.alpha_composite(base, shadow.filter(ImageFilter.GaussianBlur(max(1.5, size / 7))))
     for (x, yb, t, f), ink in zip(places, inks):
         td.text((x, yb), t, font=f, anchor="ls", fill=ink)
     return Image.alpha_composite(base, text_layer).convert("RGB")
 
 
-# When a painting is cut to fit a screen: which part to keep (horizontal, vertical centring)
+# When a painting is cut to fit a screen: which part to keep (horizontal, vertical centring),
+# or "whole": nothing is cut off and the empty edges are filled ("blur", "mat" or "frame").
 CROPS = {"middle": (0.5, 0.5), "bottom": (0.5, 1.0), "top": (0.5, 0.0)}
+CROP_MODES = (*CROPS, "whole")
+EDGES = ("blur", "mat", "frame")
+SOFT_SCALE = 1.3            # enlarged more than this to fill the screen: it looks a bit soft
 
 
-def crop_centering(value) -> tuple[float, float]:
+def crop_centering(value, focus=None) -> tuple[float, float]:
+    """The part to keep: your own choice for this painting (`focus`, 0..1 each) or the setting."""
+    if focus is not None:
+        try:
+            return min(1.0, max(0.0, float(focus[0]))), min(1.0, max(0.0, float(focus[1])))
+        except (TypeError, ValueError, IndexError):
+            pass
     return CROPS.get(value, CROPS["middle"])
+
+
+def is_soft(iw: int, ih: int, w: int, h: int, crop: str = "middle") -> bool:
+    """Would this painting have to be blown up so much for a w×h screen that it looks blurry?"""
+    if not (iw and ih):
+        return False
+    scale = min(w / iw, h / ih) if crop == "whole" else max(w / iw, h / ih)
+    return scale > SOFT_SCALE
+
+
+def _whole(im: "Image.Image", w: int, h: int, edges: str = "blur") -> "Image.Image":
+    """The whole painting on a w×h screen; the empty edges blurred, a dark mat or a gold frame."""
+    room = 0.86 if edges == "frame" else 0.94 if edges == "mat" else 1.0
+    s = min(w / im.width, h / im.height) * room
+    pw, ph = max(1, round(im.width * s)), max(1, round(im.height * s))
+    if edges == "blur":
+        small = ImageOps.fit(im, (max(8, w // 16), max(8, h // 16)), Image.BILINEAR)
+        bg = small.filter(ImageFilter.GaussianBlur(3)).resize((w, h), Image.BICUBIC)
+        bg = Image.blend(bg, Image.new("RGB", (w, h), (0, 0, 0)), 0.45)
+    else:
+        bg = Image.new("RGB", (w, h), (18, 17, 15))
+    x, y = (w - pw) // 2, (h - ph) // 2
+    if edges == "frame":                          # a simple gilt frame with a dark inner edge
+        t = max(4, min(w, h) // 70)
+        d = ImageDraw.Draw(bg)
+        d.rectangle((x - t, y - t, x + pw + t - 1, y + ph + t - 1), fill=(150, 116, 56))
+        d.rectangle((x - t // 3, y - t // 3, x + pw + t // 3 - 1, y + ph + t // 3 - 1), fill=(60, 44, 20))
+    bg.paste(im.resize((pw, ph), Image.LANCZOS), (x, y))
+    return bg
 
 
 def render(src: Path, w: int, h: int, text: str | list[str] | None = None,
            region: tuple[int, int, int, int] | None = None,
            pos: tuple[float, float] = DEFAULT_LABEL_POS,
-           style: dict | None = None, crop: str = "middle") -> "Image.Image":
+           style: dict | None = None, crop: str = "middle", focus=None, edges: str = "blur") -> "Image.Image":
     """Crop & scale `src` to exactly w×h (like Windows' 'Fill'), then label it.
     Because we crop ourselves, the label always lands on the visible part."""
     with Image.open(src) as im:
         im.draft("RGB", (w, h))            # fast JPEG decode at reduced size when possible
-        out = ImageOps.fit(im.convert("RGB"), (w, h), Image.LANCZOS, centering=crop_centering(crop))
+        rgb = im.convert("RGB")
+    if crop == "whole":
+        out = _whole(rgb, w, h, edges)
+    else:
+        out = ImageOps.fit(rgb, (w, h), Image.LANCZOS, centering=crop_centering(crop, focus))
     return add_label(out, text, region, pos, style) if text else out
 
 
@@ -441,6 +492,11 @@ def _pick(files: list[Path], sizes: dict, w: int, h: int, avoid: set, prefer: se
     time of day)."""
     target = w / h
     fitting = [p for p in files if sizes.get(p) and ratio_close(sizes[p][0] / sizes[p][1], target)]
+    if isinstance(prefer, list):                  # an ordered queue ("Coming next"): the first that suits
+        rank = {n: i for i, n in enumerate(prefer)}
+        queued = sorted((p for p in fitting if p.name in rank and p not in avoid), key=lambda p: rank[p.name])
+        if queued:
+            return queued[0]
     for pool in ([p for p in fitting if p.name in prefer and p not in avoid],
                  [p for p in fitting if p not in avoid], fitting):
         if pool:
@@ -571,7 +627,8 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               force: str | None = None, style: dict | None = None,
               favourites=None, time_of_day: bool = False,
               keep: dict | None = None, lock_screen: bool = False, seasons: bool = False,
-              record: bool = True, crop: str = "middle") -> dict:
+              record: bool = True, crop: str = "middle", edges: str = "blur",
+              focus: dict | None = None) -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -583,7 +640,8 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
     sizes = {p: image_size(sources[p][0]) for p in files}
     recent = set(cache.kv().get("rotation:recent", 1e12) or [])
     avoid = {p for p in files if p.name in recent}
-    prefer = set(prefer or [])
+    queue = list(prefer or [])                    # in order: what "Coming next" shows
+    prefer = queue
     favs = fav_names(favourites)
     tod = time_of_day_weights([sources[p][0] for p in files]) if time_of_day else {}
     season = {}
@@ -668,12 +726,13 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
         text = label_lines(meta, label_style(style)["text"]) if (label and needs_label and meta and on_this) else None
         out = current_dir() / f"{stamp}-{i}.jpg"
         if key == "span":                             # one picture across all screens: a label on each chosen one
-            im = render(src, w, h, None, region, pos, style, crop=crop)
+            im = render(src, w, h, None, region, pos, style, crop=crop, focus=(focus or {}).get(p.name), edges=edges)
             for r in (label_regions if text else []):
                 im = add_label(im, text, r, pos, style)
             im.save(out, "JPEG", quality=90)
         else:
-            render(src, w, h, text, region, pos, style, crop=crop).save(out, "JPEG", quality=90)
+            render(src, w, h, text, region, pos, style, crop=crop, focus=(focus or {}).get(p.name),
+                   edges=edges).save(out, "JPEG", quality=90)
         paths[key] = out
 
     backup.capture([current_dir(), folder, originals_dir()])   # remember your own wallpaper first
@@ -715,6 +774,68 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
 
 
 # ---------------------------------------------------------------- collection
+
+UPCOMING = 3
+
+
+def screen_shapes(screens: str = "each") -> list[tuple[int, int]]:
+    """The w×h of what gets a painting: each screen, or the whole spanned desktop."""
+    lay = monitors.layout()
+    mons = lay["monitors"] or [{"width": 1920, "height": 1080}]
+    if screens == "span" and len(mons) > 1 and lay.get("span"):
+        return [(lay["span"]["width"], lay["span"]["height"])]
+    return [(m["width"], m["height"]) for m in mons]
+
+
+def upcoming(folder: Path, s: dict | None = None, n: int = UPCOMING) -> list[str]:
+    """The next paintings, in order. Tops up the show-first queue with paintings that suit one
+    of your screens, so what "Coming next" shows really is what comes next."""
+    from . import settings as _settings
+    s = s or _settings.load()
+    files = own_files(folder)
+    names = {p.name for p in files}
+    queue = [x for x in cache.kv().get("rotation:prefer", 1e12) or [] if x in names]
+    if len(queue) < n:
+        shapes = screen_shapes(s.get("screens", "each"))
+        now = {c["name"] for c in currently_shown()}
+        recent = set(cache.kv().get("rotation:recent", 1e12) or [])
+        favs = fav_names(s.get("favourites") or [])
+
+        def suits(p):
+            size = image_size(_source_for(p)[0])
+            return bool(size) and any(ratio_close(size[0] / size[1], w / h) for w, h in shapes)
+        free = [p for p in files if p.name not in queue and p.name not in now]
+        pool = [p for p in free if p.name not in recent and suits(p)] or [p for p in free if suits(p)] or free
+        while pool and len(queue) < n:
+            p = random.choices(pool, weights=[FAVOURITE_WEIGHT if p.name in favs else 1.0 for p in pool])[0]
+            queue.append(p.name)
+            pool.remove(p)
+        cache.kv().set("rotation:prefer", queue)
+    return queue[:n]
+
+
+def reorder_upcoming(order: list[str]) -> None:
+    queue = cache.kv().get("rotation:prefer", 1e12) or []
+    first = [n for n in order if n in queue]
+    cache.kv().set("rotation:prefer", first + [n for n in queue if n not in first])
+
+
+def skip_upcoming(name: str) -> None:
+    """× on a painting in "Coming next": not now (it comes back some other time)."""
+    cache.kv().set("rotation:prefer", [n for n in cache.kv().get("rotation:prefer", 1e12) or [] if n != name])
+    recent = [n for n in cache.kv().get("rotation:recent", 1e12) or [] if n != name]
+    cache.kv().set("rotation:recent", [name] + recent[:29])
+
+
+def painting_card(folder: Path, name: str) -> dict:
+    """What the Curator tab needs to draw a painting: its text and its real size."""
+    meta = cache.kv().get(_meta_key(name), 1e12) or {}
+    p = folder / name
+    size = image_size(_source_for(p)[0]) if p.exists() else None
+    return {"name": name, "title": meta.get("title") or name, "maker": meta.get("maker", ""),
+            "year": meta.get("year", ""), "museum": meta.get("museum", ""),
+            "w": size[0] if size else 0, "h": size[1] if size else 0}
+
 
 def currently_shown() -> list[dict]:
     """One entry per screen (the same painting can be on several)."""
@@ -793,7 +914,8 @@ def _show_from_settings(s: dict | None = None, **kw) -> dict:
                      pos=label_pos(s.get("labelPos")), style=label_style(s.get("labelStyle")),
                      favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")),
                      lock_screen=bool(s.get("lockScreen")), seasons=bool(s.get("seasons")),
-                     crop=s.get("crop") or "middle", **kw)
+                     crop=s.get("crop") or "middle", edges=s.get("edges") or "blur",
+                     focus=s.get("crops") or {}, **kw)
 
 
 def relabel_folder(folder: Path, label: bool, pos=DEFAULT_LABEL_POS, style: dict | None = None) -> int:
@@ -978,7 +1100,7 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
           mode: str, screens: str = "each", interval: int = 60, set_now: bool = True,
           pos: tuple[float, float] = DEFAULT_LABEL_POS, style: dict | None = None,
           favourites=None, time_of_day: bool = False, lock_screen: bool = False,
-          seasons: bool = False, crop: str = "middle") -> dict:
+          seasons: bool = False, crop: str = "middle", edges: str = "blur", focus: dict | None = None) -> dict:
     if mode == "daily":                    # settings from older versions
         mode, interval = "rotate", 1440
     interval = max(1, min(int(interval), 31 * 1440))
@@ -1028,12 +1150,12 @@ def apply(artworks: list[Artwork], *, folder: Path, label: bool, max_files: int,
             fresh += [a["name"] for a in added]
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
                                          favourites=favourites, time_of_day=time_of_day,
-                                         lock_screen=lock_screen, seasons=seasons, crop=crop)
+                                         lock_screen=lock_screen, seasons=seasons, crop=crop, edges=edges, focus=focus)
         schedule.enable(interval)
     else:
         schedule.disable()
         result["wallpapers"] = show_next(folder, screens, label, prefer=fresh, pos=pos, style=style,
-                                         favourites=favourites, lock_screen=lock_screen, seasons=seasons, crop=crop)
+                                         favourites=favourites, lock_screen=lock_screen, seasons=seasons, crop=crop, edges=edges, focus=focus)
     result["rotation"] = schedule.status()
     result["backup"] = backup.has_backup()
     return result

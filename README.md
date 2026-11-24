@@ -29,14 +29,17 @@ that screen), *Remove* or *Never* (never show it in results again; undo under "H
 Click a painting for its info card with the museum's description or facts.
 
 **Curator** — the control centre for your desktop:
-- what's on each screen now (**Restore my wallpaper** in the bottom bar puts back exactly what you
-  had before, including the lock screen);
+- **your desktop**, live: each screen as it is arranged, showing exactly what it shows. The part of a
+  painting that is cut off to fit is drawn faded around the screen ("cut off · 29%"); drag a painting
+  to choose the part yourself (remembered per painting), or show the **whole painting** with blurred
+  edges, a dark mat or a gold frame. Paintings that would look blurry say "a bit soft";
+- beside it the **layout** (a painting per screen, the same on all, or one across all; keep the
+  middle, bottom or top) and the **label** (Auto picks dark or light text per painting; dark/light
+  box, museum plaque, shadow, subtle; sans or serif; three sizes; on all screens or only the main,
+  left or right one). Drag the label on the preview. Every change shows on your desktop at once;
+- **coming next**: the next three paintings, drag them into another order or skip one;
 - *what to show*: **Curator chooses** (new paintings every day, plus your collection) or
-  **My collection** only;
-- change every 10 minutes … once a day (or any interval), screens (a matching painting per screen,
-  the same on all, or one spanned across all), the **label** (dark/light box, museum plaque, shadow,
-  subtle; sans or serif; three sizes; on all screens or only the main, left or right one; drag it
-  anywhere on a preview of your screens), *match time of
+  **My collection** only; change every 10 minutes … once a day (or any interval), *match time of
   day*, *follow the seasons*, and the **lock screen**;
 - **your taste**: sliders from *never* to *a lot* for subjects, periods, regions and museums, the
   artists you like (from your collection and favourites), and how often you want to be surprised.

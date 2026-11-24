@@ -16,7 +16,7 @@ const TOUR_STEPS = [
   { sel: '[data-tab="collection"]', since: "0.4.0", title: "My collection",
     text: "Your paintings. Mark favourites (they come up more often), show one right now, or skip it." },
   { sel: '[data-tab="curator"]', since: "0.4.0", title: "The Curator",
-    text: "How often the painting changes, the label, the seasons, and your taste: the Curator uses it to find new paintings for you every day." },
+    text: "A live preview of your desktop with the layout and the label, what comes next, and your taste: the Curator uses it to find new paintings for you every day." },
   { sel: "#rotMode", since: "0.4.1", title: "Who chooses",
     text: "Curator chooses: new paintings every day that suit your taste, plus your collection. My collection: only what you added yourself.",
     news: "New: switch between the Curator and your own collection from any tab." },
@@ -30,9 +30,13 @@ const TOUR_STEPS = [
     text: "Your version. When an update is ready it shows here; afterwards this tour shows you just what's new. Settings → Take the tour plays it again.",
     news: "New: this tour. After every update it shows only what changed. Settings → Take the tour plays all of it again." },
   { sel: '[data-tab="curator"]', since: "0.4.3", title: "The label, where you want it",
-    news: "New: show the label on all screens, only the main one, or only the left or right screen. Curator → Label → Style & position." },
+    news: "New: show the label on all screens, only the main one, or only the left or right screen. Curator → Your desktop → Label." },
   { sel: '[data-tab="curator"]', since: "0.4.3", title: "Less sky, more painting",
-    news: "New: when a painting is cut to fit your screen, choose which part to keep: the middle, the bottom or the top. Curator → When a painting is cut to fit." },
+    news: "New: when a painting is cut to fit your screen, choose which part to keep: the middle, the bottom or the top. Curator → Your desktop → Cut to fit." },
+  { sel: '[data-tab="curator"]', since: "0.5.0", title: "Your desktop, live",
+    news: "New on the Curator tab: a live preview of your screens. See what is cut off, drag a painting to choose the part, or show the whole painting with blurred edges, a mat or a frame." },
+  { sel: '[data-tab="curator"]', since: "0.5.0", title: "Coming next",
+    news: "New: see which paintings come next, drag them into another order or skip one. A painting that would look blurry on your screen says so. And the label can now pick dark or light text by itself (Auto)." },
 ];
 
 const vtuple = (v) => String(v || "0").split(".").map((n) => parseInt(n, 10) || 0);
