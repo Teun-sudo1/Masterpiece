@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from .. import cache, content
 from ..models import Artwork, Results
-from ..net import DEFAULT_HEADERS, Blocked, _slot, get_json
+from ..net import DEFAULT_HEADERS, Blocked, _open, _slot, get_json
 
 try:
     from PIL import ImageFile
@@ -75,7 +75,7 @@ def _image_size(url: str) -> tuple[int, int] | None:
         return tuple(hit)
     req = urllib.request.Request(url, headers={**DEFAULT_HEADERS, "Range": "bytes=0-131071"})
     try:
-        with _slot(url), urllib.request.urlopen(req, timeout=20) as r:
+        with _slot(url), _open(url, req, 20) as r:
             data = r.read(131_072)                 # stop reading even if Range is ignored
     except urllib.error.HTTPError as e:
         if e.code in (403, 429):

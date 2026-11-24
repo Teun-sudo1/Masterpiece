@@ -20,72 +20,26 @@
     <button type="button" class="ver" id="verBtn" title="Check for updates"></button>
   </header>
   <main class="page curator">
-    <!-- Your desktop: what each screen shows, exactly as it looks, with the layout and label settings -->
-    <section class="desk" id="desk">
-      <div class="desk-main">
-        <h3>Your desktop</h3>
-        <p class="hint">Exactly what your screens show. The faded part is cut off: the slider beside a painting chooses the part you see. Drag the label to move it.</p>
-        <div class="desk-stage" id="deskStage"></div>
-        <div class="desk-caps" id="deskCaps"></div>
-        <div class="desk-foot" id="labelPresets">
-          <span>Label:</span>
-          <button type="button" class="link" data-pos="0.5,0.93">bottom centre</button>
-          <button type="button" class="link" data-pos="0.5,0.5">centre</button>
-          <button type="button" class="link" data-pos="0.86,0.93">bottom right</button>
-          <button type="button" class="link" data-pos="0.5,0.07">top centre</button>
-        </div>
-        <div class="desk-next" id="deskNext" hidden>
-          <div class="desk-next-head"><b>Coming next</b><span>Drag to change the order · × skips it</span></div>
+    <!-- On your screens now: what you see, and what comes next -->
+    <section class="box now-box">
+      <div class="now-head">
+        <div><h3>On your screens now</h3>
+          <p class="hint">♥ for paintings you love, thumbs up or down to teach the Curator. Layout and label: <a href="settings.html#screens">Settings › Your screens</a>.</p></div>
+      </div>
+      <div class="now-row" id="nowRow"></div>
+      <div class="desk-next" id="deskNext" hidden>
+          <div class="desk-next-head"><b>Coming next</b><span class="mood" id="mood"></span><span>Drag to change the order · × skips it</span></div>
           <div class="next-row" id="nextRow"></div>
         </div>
-      </div>
-      <div class="desk-side">
-        <div class="grp">
-          <h3>Layout</h3>
-          <div class="ctl" id="rowScreens"><span>Screens</span>
-            <span class="seg" id="segScreens" role="radiogroup"><button type="button" role="radio" data-v="each">A painting per screen</button><button type="button" role="radio" data-v="same">Same on all</button><button type="button" role="radio" data-v="span">Across all</button></span></div>
-          <div class="ctl"><span>Cut to fit</span>
-            <span class="seg" id="segCrop" role="radiogroup"><button type="button" role="radio" data-v="middle">Middle</button><button type="button" role="radio" data-v="bottom">Bottom</button><button type="button" role="radio" data-v="top">Top</button><button type="button" role="radio" data-v="whole">Whole painting</button></span></div>
-          <div class="ctl" id="rowEdges"><span>Edges</span>
-            <span class="seg" id="segEdges" role="radiogroup"><button type="button" role="radio" data-v="blur">Blurred</button><button type="button" role="radio" data-v="mat">Dark mat</button><button type="button" role="radio" data-v="frame">Gold frame</button></span></div>
-          <p class="note" id="cropNote"></p>
-        </div>
-        <div class="grp">
-          <div class="grp-head"><h3>Label</h3><label class="switch"><input type="checkbox" id="label" aria-label="Label"><span></span></label></div>
-          <div id="labelOpts" class="label-opts">
-            <div class="ctl" id="rowWhere"><span>On</span>
-              <span class="seg" id="segWhere" role="radiogroup"><button type="button" role="radio" data-v="all">All screens</button><button type="button" role="radio" data-v="main">Main</button><button type="button" role="radio" data-v="left">Left</button><button type="button" role="radio" data-v="right">Right</button></span></div>
-            <div class="ctl"><span>Look</span>
-              <span class="seg" id="segLook" role="radiogroup"><button type="button" role="radio" data-v="auto">Auto</button><button type="button" role="radio" data-v="dark">Dark</button><button type="button" role="radio" data-v="light">Light</button><button type="button" role="radio" data-v="plaque">Plaque</button><button type="button" role="radio" data-v="shadow">Shadow</button><button type="button" role="radio" data-v="subtle">Subtle</button></span></div>
-            <p class="note">Auto: dark or light text per painting, so it is always readable.</p>
-            <div class="ctl"><span>Text</span>
-              <select id="labelText" aria-label="Text">
-                <option value="full">Title — Artist, year · Museum</option>
-                <option value="two">Two lines</option>
-                <option value="artist">Title — Artist, year</option>
-                <option value="title">Title (year)</option>
-              </select></div>
-            <div class="ctl"><span>Font &amp; size</span>
-              <span class="ctl-pair"><span class="seg" id="segFont" role="radiogroup"><button type="button" role="radio" data-v="sans">Sans</button><button type="button" role="radio" data-v="serif"><span class="serif">Serif</span></button></span>
-                <span class="seg" id="segSize" role="radiogroup"><button type="button" role="radio" data-v="s">S</button><button type="button" role="radio" data-v="m">M</button><button type="button" role="radio" data-v="l">L</button></span></span></div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <div class="curator-cols">
       <!-- How it changes -->
       <section class="box">
-        <h3>What to show</h3>
-        <div class="source-pick" id="sourcePick" role="radiogroup" aria-label="What to show">
-          <button type="button" role="radio" data-mode="curator">
-            <b>Curator chooses</b><span>New paintings every day that suit your taste, plus your collection.</span></button>
-          <button type="button" role="radio" data-mode="rotate">
-            <b>My collection</b><span>Only the paintings you added yourself.</span></button>
-        </div>
+        <h3>How it changes</h3>
 
         <div class="row">
-          <div class="what"><b>Change every</b></div>
+          <div class="what"><b>New painting every</b></div>
           <span class="interval">
             <select id="interval" aria-label="Change every">
               <option value="10">10 minutes</option><option value="30">30 minutes</option>
@@ -98,6 +52,11 @@
                 <option value="60">hours</option><option value="1440">days</option></select>
             </span>
           </span>
+        </div>
+        <div class="row">
+          <div class="what"><b>New from the Curator</b><span>Found in the museums, added to your collection.</span></div>
+          <select id="curatorDaily" aria-label="New from the Curator"><option value="1">1 a day</option><option value="2">2 a day</option>
+            <option value="3">3 a day</option><option value="5">5 a day</option></select>
         </div>
         <div class="row">
           <div class="what"><b>Match time of day</b><span>Brighter by day, darker in the evening.</span></div>
@@ -116,10 +75,18 @@
       <!-- Your taste -->
       <section class="box taste" id="tasteBox">
         <div class="taste-head">
-          <h3>Your taste</h3>
+          <h3>What the Curator looks for</h3>
           <button type="button" class="small" id="askBtn">Ask the Curator now</button>
         </div>
-        <p class="muted" id="tasteNote">The Curator looks for paintings like these. Slide to “never” to leave something out.</p>
+        <p class="muted" id="tasteNote">Tap what you'd like more of. Your thumbs up and down do the rest.</p>
+        <div class="chips subject-chips" id="subjectChips"></div>
+        <div class="taste-extra" id="learnedBox" hidden>
+          <div class="what"><b>What your thumbs taught</b><span id="learnedCount"></span></div>
+          <div class="learned" id="learned"></div>
+        </div>
+        <details class="finetune" id="finetune">
+          <summary><b>Fine-tune</b><span>subjects, periods, regions, museums, artists, surprises</span></summary>
+        <p class="muted">Slide to “never” to leave something out.</p>
         <div class="taste-tabs seg" id="tasteTabs" role="tablist">
           <button type="button" data-group="subjects" class="on">Subjects</button>
           <button type="button" data-group="periods">Periods</button>
@@ -137,11 +104,7 @@
           <input type="range" min="0" max="4" step="1" id="surprise" aria-label="Surprise me">
           <span class="s-val" id="surpriseVal"></span>
         </div>
-        <div class="row">
-          <div class="what"><b>New paintings per day</b></div>
-          <select id="curatorDaily"><option value="1">1</option><option value="2">2</option>
-            <option value="3">3</option><option value="5">5</option></select>
-        </div>
+        </details>
       </section>
     </div>
 

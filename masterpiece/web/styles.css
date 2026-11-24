@@ -119,6 +119,20 @@ button.tag { cursor: pointer; }
 .nx .tag { margin: 2px 0 0; }
 .nx .x { position: absolute; right: 4px; top: 3px; padding: 0 6px; border: 0; background: none; color: var(--muted); font-size: 15px; }
 .nx .x:hover { color: var(--text); }
+.desk-next-head .mood { flex: 1; margin-left: 10px; color: var(--accent); }
+.thumbs { display: inline-flex; gap: 2px; margin-left: 8px; vertical-align: middle; }
+.thumb-btn { display: inline-grid; place-items: center; width: 24px; height: 22px; padding: 0; border: 1px solid transparent;
+  border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.thumb-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
+.thumb-btn:hover { color: var(--text); border-color: var(--line); }
+.thumb-btn.on { color: var(--accent); border-color: var(--accent); }
+.thumb-btn.on svg { fill: color-mix(in srgb, var(--accent) 25%, transparent); }
+.learned { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 12px; }
+.learned span { padding: 1px 9px; border-radius: 99px; border: 1px solid var(--line); }
+.learned .chip-more { border-color: var(--accent); color: var(--accent); }
+.learned .chip-less { color: var(--muted); }
+.offline-pill { margin-left: 8px; padding: 0 8px; border-radius: 99px; border: 1px solid #c98a3a; color: #e0a35a;
+  font-size: 11px; line-height: 1.6; }
 .desk-side { padding: 18px 22px 16px; display: grid; gap: 14px; align-content: start; }
 .desk-side .grp { display: grid; gap: 9px; }
 .desk-side .grp + .grp { border-top: 1px solid var(--line); padding-top: 14px; }
@@ -132,7 +146,43 @@ button.tag { cursor: pointer; }
 .ctl-pair { display: flex; gap: 8px; flex-wrap: wrap; }
 .desk-side .note { margin: -3px 0 0 102px; font-size: 12px; color: var(--muted); }
 .serif { font-family: var(--serif); }
-.desk + .curator-cols { margin-top: 16px; }
+.desk + .curator-cols, .now-box + .curator-cols { margin-top: 16px; }
+.page.settings > .desk { column-span: all; margin: 0 0 16px; }
+/* Curator: what's on your screens now */
+.now-head h3 { margin: 0 0 4px; }
+.now-head .hint { margin: 0 0 14px; color: var(--muted); font-size: 12.5px; }
+.now-head .hint a { color: var(--text); }
+.now-row { display: flex; gap: 12px; align-items: flex-end; }
+.now-tile { margin: 0; min-width: 0; max-width: 640px; }
+.now-pic { display: block; position: relative; border-radius: 6px; overflow: hidden; background: var(--panel-2);
+  box-shadow: 0 0 0 1px var(--line-2), 0 10px 30px rgba(0,0,0,.45); }
+.now-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.now-pic::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 25%, var(--sheen) 50%, transparent 75%) var(--panel-2);
+  background-size: 220% 100%; animation: loading-sheen 1.5s ease-in-out infinite; }
+.now-pic:has(img.loaded)::before { display: none; }
+.now-tile figcaption { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+.now-tile .t { flex: 1; min-width: 0; }
+.now-tile .t b { display: block; font: italic 700 13.5px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now-tile .t span { color: var(--muted); font-size: 12px; }
+.now-tile .thumbs { margin-left: 0; gap: 5px; }
+.now-tile .thumb-btn { width: 32px; height: 30px; border-color: var(--line-2); }
+.now-tile .thumb-btn svg { width: 16px; height: 16px; }
+.now-box .desk-next { margin-top: 18px; }
+.subject-chips { margin: 10px 0 4px; }
+.subject-chips .chip { padding: 5px 13px; border-radius: 99px; border: 1px solid var(--line-2); background: none;
+  color: var(--muted); font-size: 13px; cursor: pointer; }
+.subject-chips .chip:hover { color: var(--text); }
+.subject-chips .chip.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.subject-chips .chip.on::before { content: "✓ "; }
+.subject-chips .chip.less { opacity: .6; text-decoration: line-through; }
+.finetune { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.finetune summary { cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: baseline; }
+.finetune summary::-webkit-details-marker { display: none; }
+.finetune summary::before { content: "▸"; color: var(--muted); }
+.finetune[open] summary::before { content: "▾"; }
+.finetune summary span { color: var(--muted); font-size: 12.5px; }
+.finetune[open] summary { margin-bottom: 10px; }
 @media (max-width: 1100px) {
   .desk { grid-template-columns: 1fr; }
   .desk-main { border-right: 0; border-bottom: 1px solid var(--line); }

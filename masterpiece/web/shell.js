@@ -34,7 +34,9 @@ const ICONS = {
   prev: "M15 5l-7 7 7 7", next: "M9 5l7 7-7 7", pause: "M8 5v14M16 5v14", play: "M7 5l12 7-12 7z",
   restore: "M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4", heart: "M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z",
   filter: "M4 6h16M7 12h10M10 18h4", sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z",
-  chevron: "M6 9l6 6 6-6", globe: "M3 12h18M12 3c2.8 2.6 4.2 5.6 4.2 9s-1.4 6.4-4.2 9c-2.8-2.6-4.2-5.6-4.2-9S9.2 5.6 12 3z",
+  chevron: "M6 9l6 6 6-6",
+  up: "M7 11v9H4v-9h3zm0 0l4-8c1.7 0 2.8 1.2 2.4 2.9L13 9h5.4c1.3 0 2.2 1.2 1.9 2.4l-1.6 6.4c-.3 1.3-1.4 2.2-2.7 2.2H7",
+  down: "M17 13V4h3v9h-3zm0 0l-4 8c-1.7 0-2.8-1.2-2.4-2.9L11 15H5.6c-1.3 0-2.2-1.2-1.9-2.4l1.6-6.4C5.6 4.9 6.7 4 8 4h9", globe: "M3 12h18M12 3c2.8 2.6 4.2 5.6 4.2 9s-1.4 6.4-4.2 9c-2.8-2.6-4.2-5.6-4.2-9S9.2 5.6 12 3z",
 };
 function icon(name, extra = "") {
   const NS = "http://www.w3.org/2000/svg";
@@ -159,7 +161,9 @@ function renderRotBar(r) {
   const active = !!r.active, paused = !!r.paused;
   const status = !active ? (r.count ? "Not running" : "Your collection is still empty")
     : paused ? "Paused" : `Changes ${intervalText(r.interval)}${r.nextRun ? ` · next at ${shortTime(r.nextRun)}` : ""}`;
-  $("rotStatus").replaceChildren(el("span", { class: `dot${active && !paused ? " on" : ""}` }), status);
+  $("rotStatus").replaceChildren(...[el("span", { class: `dot${active && !paused ? " on" : ""}` }), status,
+    r.offline && el("span", { class: "offline-pill", title: "No internet connection. Masterpiece keeps changing between "
+      + `the ${r.count || ""} paintings you have; the Curator looks for new ones once you're back online.` }, "Offline")].filter(Boolean));
   for (const b of $("rotMode").querySelectorAll("button")) {
     const on = b.dataset.mode === (r.mode === "curator" ? "curator" : "rotate");
     b.classList.toggle("on", on);

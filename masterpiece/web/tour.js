@@ -16,7 +16,7 @@ const TOUR_STEPS = [
   { sel: '[data-tab="collection"]', since: "0.4.0", title: "My collection",
     text: "Your paintings. Mark favourites (they come up more often), show one right now, or skip it." },
   { sel: '[data-tab="curator"]', since: "0.4.0", title: "The Curator",
-    text: "A live preview of your desktop with the layout and the label, what comes next, and your taste: the Curator uses it to find new paintings for you every day." },
+    text: "What is on your screens now (with ♥ and thumbs up or down), what comes next, how often it changes, and what the Curator looks for when it finds new paintings for you every day." },
   { sel: "#rotMode", since: "0.4.1", title: "Who chooses",
     text: "Curator chooses: new paintings every day that suit your taste, plus your collection. My collection: only what you added yourself.",
     news: "New: switch between the Curator and your own collection from any tab." },
@@ -24,7 +24,7 @@ const TOUR_STEPS = [
     text: "Previous, pause, next, and Restore my wallpaper, which puts back exactly what you had before.",
     news: "New: previous, pause, next and Restore are now in this bar on every tab." },
   { sel: '[data-tab="settings"]', since: "0.4.1", title: "Settings",
-    text: "A dark or light look, how many paintings to keep, start with Windows, updates and storage.",
+    text: "Your screens: a live preview with the layout and the label. Also a dark or light look, how many paintings to keep, start with Windows, updates and storage.",
     news: "New: a light look. Settings → Appearance." },
   { sel: "#verBtn", since: "0.4.2", title: "Updates",
     text: "Your version. When an update is ready it shows here; afterwards this tour shows you just what's new. Settings → Take the tour plays it again.",
@@ -39,6 +39,14 @@ const TOUR_STEPS = [
     news: "New: see which paintings come next, drag them into another order or skip one. A painting that would look blurry on your screen says so. And the label can now pick dark or light text by itself (Auto)." },
   { sel: '[data-tab="curator"]', since: "0.5.1", title: "A slider for the part you see",
     news: "New: on the Curator tab, the slider beside each painting chooses the part you see (top … bottom). And pictures that are still loading now show a soft moving sheen." },
+  { sel: '[data-tab="curator"]', since: "0.6.0", title: "More or less like this",
+    news: "New: thumbs up or down beside each painting on the Curator tab (and in the tray menu). The Curator learns from them: more of that artist, subject and period, or less. Thumbs down also takes the painting away." },
+  { sel: '[data-tab="curator"]', since: "0.6.0", title: "Time of day and seasons",
+    news: "“Match time of day” and “Follow the seasons” now also decide what is coming next. When the evening starts or the season turns, Masterpiece plans again." },
+  { sel: '[data-tab="settings"]', since: "0.6.0", title: "Your screens moved",
+    news: "The live preview with the layout and the label is now in Settings → Your screens, with all the same options. The Curator tab is simpler: what's on your screens, what comes next and what the Curator looks for." },
+  { sel: "#rotBar", since: "0.6.0", title: "Works offline",
+    news: "Without internet, Masterpiece keeps changing between the paintings you already have and says “Offline” down here. The Curator looks for new ones once you're back online." },
 ];
 
 const vtuple = (v) => String(v || "0").split(".").map((n) => parseInt(n, 10) || 0);

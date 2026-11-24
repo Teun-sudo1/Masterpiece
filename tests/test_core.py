@@ -1086,3 +1086,105 @@ def test_coming_next_is_planned_followed_reordered_and_skipped(tmp_path, monkeyp
     assert list(shown.values()) == [f"P{after[0][4]}"]
     card = wallpaper.painting_card(folder, after[0])
     assert card["w"] == 1600 and card["h"] == 900 and card["title"].startswith("P")
+
+
+def test_coming_next_follows_the_mood_and_is_planned_again(tmp_path, monkeypatch):
+    PIL = pytest.importorskip("PIL.Image")
+    from masterpiece import cache, monitors
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    for n in range(12):                       # 6 dark, 6 bright
+        v = 20 if n < 6 else 235
+        PIL.new("RGB", (1600, 900), (v, v, v)).save(folder / f"aic-{n}.jpg")
+        cache.kv().set(f"art:aic-{n}.jpg", {"title": f"P{n}", "maker": "M", "museum": "X"})
+        cache.kv().set(f"labelled:aic-{n}.jpg", False)
+    lay = {"monitors": [{"id": "A", "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True}], "span": None}
+    monkeypatch.setattr(monitors, "layout", lambda: lay)
+    s = {"screens": "each", "folder": str(folder), "timeOfDay": True}
+    dark = {f"aic-{n}.jpg" for n in range(6)}
+    monkeypatch.setattr(wallpaper, "daypart", lambda hour=None: "evening")
+    dark_hits = 0
+    for _ in range(30):
+        cache.kv().set("rotation:prefer", [])
+        dark_hits += len(set(wallpaper.upcoming(folder, s)) & dark)
+    assert dark_hits > 60                                  # mostly dark ones in the evening
+    evening = wallpaper.upcoming(folder, s)
+    wallpaper.reorder_upcoming([evening[1]])               # one you moved yourself stays
+    monkeypatch.setattr(wallpaper, "daypart", lambda hour=None: "day")
+    day = wallpaper.upcoming(folder, s)
+    assert day[0] == evening[1]
+    assert wallpaper.mood(s) == {"daypart": "day", "season": ""}
+    # statistically: over many plans, bright ones win by day
+    bright_hits = 0
+    for _ in range(30):
+        cache.kv().set("rotation:prefer", [])
+        bright_hits += sum(1 for x in wallpaper.upcoming(folder, s) if x not in dark)
+    assert bright_hits > 60
+
+
+def test_thumbs_teach_the_curator(tmp_path, monkeypatch):
+    import random
+    from masterpiece import cache, curator, settings
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    (folder / "aic-1.jpg").write_bytes(b"x")
+    (folder / "aic-2.jpg").write_bytes(b"x")
+    cache.kv().set("art:aic-1.jpg", {"id": "aic-1", "title": "Winter landscape", "maker": "Claude Monet", "year": "1868"})
+    cache.kv().set("art:aic-2.jpg", {"id": "aic-2", "title": "Portrait of a man", "maker": "Frans Hals", "year": "1650"})
+    settings.save({"folder": str(folder)})
+    monkeypatch.setattr(wallpaper, "currently_shown", lambda: [])
+    assert curator.thumb("aic-1.jpg", 1)["thumb"] == 1
+    r = curator.thumb("aic-2.jpg", -1)
+    assert r["thumb"] == -1 and not (folder / "aic-2.jpg").exists()          # thumbs down: it goes…
+    s = settings.load()
+    assert any(b["id"] == "aic-2" for b in s["banned"])                       # …for good
+    assert curator.thumb_of(s, "aic-1.jpg") == 1
+    L = curator.learned(s)
+    assert L["makers"]["Claude Monet"] == 1 and L["subjects"]["landscape"] == 1 and L["museums"]["aic"] == 0
+    assert L["periods"]["1600"] == -1
+    assert curator.taste(s, folder)["Claude Monet"] >= 4 and "Frans Hals" not in curator.taste(s, folder)
+    w = curator._nudged({"landscape": 1.0, "portraits": 1.0, "religious": 0.0}, Counter_({"landscape": 2, "religious": 3}))
+    assert w["landscape"] > 2 and w["portraits"] == 1.0 and w["religious"] == 0.0     # never stays never
+    summary = curator.learned_summary(s)
+    assert summary["up"] == 1 and summary["down"] == 1 and "Claude Monet" in summary["more"] and "Frans Hals" in summary["less"]
+    assert curator.thumb("aic-1.jpg", 0)["thumb"] == 0 and curator.thumb_of(settings.load(), "aic-1.jpg") == 0
+    plans = curator.plan(settings.load(), curator.taste(settings.load(), folder), 5, random.Random(1))
+    assert len(plans) == 5
+
+
+def Counter_(d):
+    from collections import Counter
+    return Counter(d)
+
+
+def test_offline_is_recognised_and_the_curator_waits(tmp_path, monkeypatch):
+    import socket
+    import urllib.error
+    import urllib.request
+    from masterpiece import cache, curator, net, settings
+
+    def down(*a, **k):
+        raise urllib.error.URLError(socket.gaierror(11001, "getaddrinfo failed"))
+    monkeypatch.setattr(urllib.request, "urlopen", down)
+    with pytest.raises(net.Offline):
+        net.get_json("https://api.artic.edu/api/v1/artworks/search")
+    assert cache.kv().get("net:offline", 1e12)
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: (_ for _ in ()).throw(socket.gaierror()))
+    assert net.offline_since()                              # still offline
+    # the Curator doesn't use up its day while offline
+    monkeypatch.setattr(curator, "discover", lambda s=None, **k: (_ for _ in ()).throw(net.Offline("no internet")))
+    settings.save({"mode": "curator"})
+    assert curator.run_if_due(force=True) == []
+    assert cache.kv().get("curator:last", 1e12) is None and cache.kv().get("curator:waiting", 1e12)
+    assert curator.due(settings.load())
+    # a timeout is not "offline"
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(urllib.error.URLError(TimeoutError("timed out"))))
+    with pytest.raises(urllib.error.URLError):
+        net.fetch("https://api.artic.edu/x")
+
+
+def test_search_says_offline_kindly(monkeypatch):
+    from masterpiece import net, search
+    monkeypatch.setattr(search, "_collect", lambda *a, **k: (_ for _ in ()).throw(net.Offline("x")))
+    r = search.search_all(["aic"], query="monet")
+    assert "offline" in r["errors"]["aic"]

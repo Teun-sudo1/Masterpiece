@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import cache, content, monitors, settings, wallpaper
 from .models import Artwork
+from .net import Offline
 from .search import search_all
 from .sources import SOURCES
 
@@ -59,7 +60,124 @@ def taste(s: dict, folder: Path) -> Counter:
         if not m or UNKNOWN.search(m) or m.lower() == "artist":
             continue
         makers[m] += 3 if item["id"] in favs else 1
-    return makers
+    for m, n in learned(s)["makers"].items():           # thumbs: up adds, down takes away
+        makers[m] += 4 * n
+    return Counter({m: n for m, n in makers.items() if n > 0})
+
+
+# ------------------------------------------------------------------ thumbs up / down
+# "More like this" / "Less like this" on a painting you see. Each thumb remembers the painting's
+# artist, subjects, period and museum; the Curator leans towards (or away from) those.
+THUMBS_KEEP = 300
+NUDGE = 1.6                        # one thumb = ×1.6 (or ÷1.6) on that subject/period/museum
+NUDGE_RANGE = (0.3, 4.0)
+
+
+def subjects_of(title: str) -> list[str]:
+    import re as _re
+    t = content.fold(title or "")
+    return [k for k, v in content.SUBJECTS.items()
+            if any(_re.search(r"\b" + _re.escape(content.fold(w)) + r"\b", t) for w in [v["keyword"], *v["aic"]])]
+
+
+def period_of(year) -> str | None:
+    import re as _re
+    m = _re.search(r"-?\d{3,4}", str(year or ""))
+    if not m:
+        return None
+    y = int(m.group())
+    return next((k for k, p in content.PERIODS.items() if p["start"] <= y < p["end"]), None)
+
+
+def thumb_entry(meta: dict, value: int) -> dict:
+    """What a thumb remembers about a painting (meta: the collection's text for it)."""
+    aid = str(meta.get("id") or "")
+    maker = (meta.get("maker") or "").strip()
+    return {"v": 1 if value > 0 else -1, "title": meta.get("title") or "",
+            "maker": "" if not maker or UNKNOWN.search(maker) else maker,
+            "subjects": subjects_of(meta.get("title") or ""), "period": period_of(meta.get("year")),
+            "museum": aid.split("-", 1)[0] if "-" in aid else "", "date": _today()}
+
+
+def set_thumb(meta: dict, value: int) -> dict:
+    """value 1 = more like this, -1 = less like this, 0 = forget the thumb. Returns all thumbs."""
+    aid = str(meta.get("id") or "")
+    thumbs = dict(settings.load().get("thumbs") or {})
+    thumbs.pop(aid, None)
+    if value and aid:
+        thumbs[aid] = thumb_entry(meta, value)
+    thumbs = dict(list(thumbs.items())[-THUMBS_KEEP:])
+    return settings.save({"thumbs": thumbs})["thumbs"]
+
+
+def thumb(name: str, value: int) -> dict:
+    """A thumb on a painting from your collection. Down: the Curator leans away from it, and the
+    painting itself goes (off your screen, out of your collection, never shown again).
+    Returns {"thumb": the new value, "wallpapers": what replaced it (thumb down on screen)}."""
+    s = settings.load()
+    folder = wallpaper.resolve_folder(s.get("folder"))
+    meta = dict(cache.kv().get(wallpaper._meta_key(name), 1e12) or {})
+    meta.setdefault("id", Path(name).stem)
+    value = 1 if value > 0 else -1 if value < 0 else 0
+    set_thumb(meta, value)
+    out: dict = {"thumb": value}
+    if value < 0:
+        banned = [b for b in s.get("banned") or [] if b.get("id") != meta["id"]]
+        banned.append({"id": meta["id"], "title": meta.get("title") or name, "maker": meta.get("maker") or "",
+                       "museum": meta.get("museum") or ""})
+        settings.save({"banned": banned,
+                       "selection": [a for a in s.get("selection") or [] if a.get("id") != meta["id"]]})
+        wallpaper.skip_upcoming(name)
+        if name in {c["name"] for c in wallpaper.currently_shown()}:
+            out["wallpapers"] = wallpaper.skip(name).get("wallpapers", {})
+        else:
+            wallpaper.remove(folder, name)
+    return out
+
+
+def thumb_of(s: dict, name: str) -> int:
+    meta = cache.kv().get(wallpaper._meta_key(name), 1e12) or {}
+    t = (s.get("thumbs") or {}).get(str(meta.get("id") or Path(name).stem)) or {}
+    return 1 if t.get("v", 0) > 0 else -1 if t.get("v", 0) < 0 else 0
+
+
+def learned(s: dict) -> dict:
+    """Sums of the thumbs per artist, subject, period and museum (+ more, − less)."""
+    out = {"makers": Counter(), "subjects": Counter(), "periods": Counter(), "museums": Counter()}
+    for t in (s.get("thumbs") or {}).values():
+        v = 1 if t.get("v", 0) > 0 else -1
+        if t.get("maker"):
+            out["makers"][t["maker"]] += v
+        for k in t.get("subjects") or ():
+            out["subjects"][k] += v
+        if t.get("period"):
+            out["periods"][t["period"]] += v
+        if t.get("museum"):
+            out["museums"][t["museum"]] += v
+    return out
+
+
+def learned_summary(s: dict) -> dict:
+    """For the Curator tab: what the thumbs taught, in words."""
+    L = learned(s)
+    names = {"subjects": {k: v["label"] for k, v in content.SUBJECTS.items()},
+             "periods": {k: v["label"] for k, v in content.PERIODS.items()},
+             "museums": {k: getattr(m, "NAME", k) for k, m in SOURCES.items()}}
+    more, less = [], []
+    for group in ("makers", "subjects", "periods", "museums"):
+        for k, n in L[group].most_common():
+            label = k if group == "makers" else names[group].get(k, k)
+            (more if n > 0 else less if n < 0 else []).append(label)
+    thumbs = s.get("thumbs") or {}
+    return {"up": sum(1 for t in thumbs.values() if t.get("v", 0) > 0),
+            "down": sum(1 for t in thumbs.values() if t.get("v", 0) < 0),
+            "more": more[:5], "less": less[:5]}
+
+
+def _nudged(w: dict, sums: Counter) -> dict:
+    """Slider weights moved by the thumbs. "Never" stays never."""
+    lo, hi = NUDGE_RANGE
+    return {k: (v if not v or not sums.get(k) else min(hi, max(lo, v * NUDGE ** sums[k]))) for k, v in w.items()}
 
 
 LEVEL_WEIGHT = [0.0, 0.4, 1.0, 2.5, 5.0]       # slider 0 never · 1 less · 2 normal · 3 more · 4 a lot
@@ -91,8 +209,9 @@ def plan(s: dict, makers: Counter, count: int, rng: random.Random) -> list[dict]
     """What to look for: one search per new painting, varied, following your sliders."""
     muted = {m.lower() for m in s.get("curatorMutedArtists") or []}
     top = [(m, n) for m, n in makers.most_common(12) if m.lower() not in muted][:8]
-    subj_w = weights(s, "subjects", content.SUBJECTS)
-    period_w = weights(s, "periods", content.PERIODS)
+    L = learned(s)
+    subj_w = _nudged(weights(s, "subjects", content.SUBJECTS), L["subjects"])
+    period_w = _nudged(weights(s, "periods", content.PERIODS), L["periods"])
     region_w = weights(s, "regions", content.REGIONS)
     strategies = [("subject", 3.0)]
     if top:
@@ -134,9 +253,12 @@ def _never_filter(s: dict):
     never_subj = [k for k, v in weights(s, "subjects", content.SUBJECTS).items() if v == 0]
     words = [content.fold(w) for k in never_subj for w in [content.SUBJECTS[k]["keyword"], *content.SUBJECTS[k]["aic"]]]
     never_periods = [content.PERIODS[k] for k, v in weights(s, "periods", content.PERIODS).items() if v == 0]
+    less_makers = {m.lower() for m, n in learned(s)["makers"].items() if n <= -2}
     import re as _re
 
     def ok(d: dict) -> bool:
+        if (d.get("maker") or "").strip().lower() in less_makers:
+            return False
         title = content.fold(d.get("title") or "")
         if any(_re.search(r"\b" + _re.escape(w) + r"\b", title) for w in words):
             return False
@@ -149,7 +271,7 @@ def _never_filter(s: dict):
 
 def _museums(s: dict, enabled: list[str], n: int, rng: random.Random) -> list[str]:
     """Up to n museums, weighted by your museum sliders (never = left out)."""
-    w = weights(s, "museums", enabled)
+    w = _nudged(weights(s, "museums", enabled), learned(s)["museums"])
     pool = [k for k in enabled if w[k] > 0]
     chosen = []
     while pool and len(chosen) < n:
@@ -193,8 +315,12 @@ def discover(s: dict | None = None, count: int | None = None, rng: random.Random
             r = search_all(keys, cursors={k: rng.randint(*pages) for k in keys}, query=p["query"],
                            subject=p["subject"], period=p.get("period"), region=p.get("region"),
                            max_pages=1, **filters)          # one page per museum: modest and quick
+        except Offline:
+            raise
         except Exception:
             continue
+        if not r["results"] and r["errors"] and all("offline" in e for e in r["errors"].values()):
+            raise Offline("no internet connection")
         fresh = [d for d in r["results"] if d["id"] not in have and d["id"] not in hidden and keep(d)]
         if not fresh:
             continue
@@ -204,6 +330,10 @@ def discover(s: dict | None = None, count: int | None = None, rng: random.Random
             path = wallpaper.download(art, folder, label=bool(s.get("label", True)),
                                       pos=wallpaper.label_pos(s.get("labelPos")),
                                       style=wallpaper.label_style(s.get("labelStyle")))
+        except Offline:
+            if added:
+                break
+            raise
         except Exception:
             continue
         reason = p["reason"]
@@ -234,7 +364,14 @@ def run_if_due(s: dict | None = None, force: bool = False) -> list[dict] | None:
         return None                                  # another process is already at it
     cache.kv().set("curator:running", time.time())
     try:
-        added = discover(s)
+        try:
+            added = discover(s)
+        except Offline:
+            # No internet: keep rotating what you have. Today's look isn't used up: the next
+            # rotation (or "Ask the Curator now") tries again.
+            cache.kv().set("curator:waiting", True)
+            return []
+        cache.kv().set("curator:waiting", None)
         cache.kv().set("curator:last", _today())
         cache.kv().set("curator:latest", added)
         return added

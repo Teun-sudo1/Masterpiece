@@ -21,7 +21,8 @@ from pathlib import Path
 
 from . import backup, cache, content, monitors, schedule, settings, sources, wallpaper
 from .models import Artwork
-from .net import Blocked, fetch
+from . import net
+from .net import Blocked, Offline, fetch
 from .search import search_all
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -142,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._search(qs)
                 if url.path == "/api/img":
                     return self._img(qs.get("u", ""))
-            except Blocked as e:                      # a museum asked us to slow down: no trace, just say so
+            except (Blocked, Offline) as e:           # slow down / offline: no trace, just say so
                 return self._error(503, str(e))
             except Exception as e:
                 import traceback
@@ -266,6 +267,7 @@ class Handler(BaseHTTPRequestHandler):
                 "hasPrevious": len(cache.kv().get("rotation:history", 1e12) or []) > 1,
                 "curatorLatest": curator.latest(), "curatorLast": cache.kv().get("curator:last", 1e12) or "",
                 "curatorBusy": bool(cache.kv().get("curator:running", curator.RUN_GUARD)),
+                "offline": bool(net.offline_since()), "curatorWaiting": bool(cache.kv().get("curator:waiting", 1e12)),
                 **self._desktop(s, folder)}
 
     def _desktop(self, s: dict, folder) -> dict:
@@ -275,15 +277,22 @@ class Handler(BaseHTTPRequestHandler):
         crops = s.get("crops") or {}
         cards = {}
 
+        from . import curator
+        favs = set(s.get("favourites") or [])
+
         def card(name):
             if name not in cards:
-                cards[name] = {**wallpaper.painting_card(folder, name), "focus": crops.get(name)}
+                c = wallpaper.painting_card(folder, name)
+                cards[name] = {**c, "focus": crops.get(name), "thumb": curator.thumb_of(s, name),
+                               "favourite": c["id"] in favs}
             return cards[name]
         return {
             "screens": [{k: m.get(k) for k in ("id", "x", "y", "width", "height", "primary")} for m in lay["monitors"]],
             "onScreens": [{"key": c.get("key"), "screen": c.get("screen"), **card(c["name"])}
                           for c in wallpaper.currently_shown() if (folder / c["name"]).exists()],
             "upcoming": [card(n) for n in wallpaper.upcoming(folder, s)],
+            "mood": wallpaper.mood(s),
+            "learned": curator.learned_summary(s),
         }
 
     def _rotation(self, action: str | None, name: str | None = None, body: dict | None = None):
@@ -338,6 +347,13 @@ class Handler(BaseHTTPRequestHandler):
                 crops.pop(name, None)
             s = settings.save({"crops": crops})
             return self._json({**wallpaper.refresh_labels(s), **self._rotation_status()})
+        if action == "thumb":                    # more (1) / less (-1) like this, 0 = forget
+            from . import curator
+            r = curator.thumb(name, int(body.get("value") or 0))
+            return self._json({**self._rotation_status(), **r})
+        if action == "forgetThumbs":             # "Forget" under what the thumbs taught
+            settings.save({"thumbs": {}})
+            return self._json(self._rotation_status())
         if action == "queue":                    # "Coming next" dragged into a new order
             wallpaper.reorder_upcoming([str(n) for n in body.get("order") or []])
             return self._json(self._rotation_status())

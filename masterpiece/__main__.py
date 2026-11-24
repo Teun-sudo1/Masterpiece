@@ -57,14 +57,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd in ("next", "daily"):
         s = settings.load()
         folder = wallpaper.resolve_folder(s.get("folder"))
-        prefer = []
         if s.get("mode") == "curator":
             from . import curator
             try:
-                prefer = [a["name"] for a in curator.run_if_due(s) or []]
+                curator.run_if_due(s)                # new ones go to the front of "Coming next"
             except Exception as e:                   # offline etc.: just rotate what we have
                 print(f"Curator: {e}", file=sys.stderr)
-        chosen = wallpaper.show_from_settings(s, prefer=prefer)
+        chosen = wallpaper.show_from_settings(s)     # follows "Coming next"
         if not chosen:
             print(f"No paintings in {folder}. Open Masterpiece first.", file=sys.stderr)
             return 1

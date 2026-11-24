@@ -40,6 +40,7 @@ DEFAULTS: dict = {
     "selection": [],              # list of Artwork dicts
     "banned": [],                 # "never show again": [{id, title, maker, museum}]
     "favourites": [],             # artwork IDs that come up more often in the rotation
+    "thumbs": {},                 # "more / less like this": {artwork ID: what the Curator learned from it}
     "timeOfDay": False,           # brighter paintings by day, darker in the evening
     "trayAtLogin": False,
     "skipVersion": "",            # "Later" on an update notice: don't mention this version again

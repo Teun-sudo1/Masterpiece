@@ -20,6 +20,54 @@
     <button type="button" class="ver" id="verBtn" title="Check for updates"></button>
   </header>
   <main class="page settings">
+    <!-- Your screens: what each screen shows, exactly as it looks, with the layout and label settings -->
+    <section class="desk" id="screens">
+      <div class="desk-main">
+        <h3>Your screens</h3>
+        <p class="hint">Exactly what your screens show. The faded part is cut off: the slider beside a painting chooses the part you see. Drag the label to move it.</p>
+        <div class="desk-stage" id="deskStage"></div>
+        <div class="desk-caps" id="deskCaps"></div>
+        <div class="desk-foot" id="labelPresets">
+          <span>Label:</span>
+          <button type="button" class="link" data-pos="0.5,0.93">bottom centre</button>
+          <button type="button" class="link" data-pos="0.5,0.5">centre</button>
+          <button type="button" class="link" data-pos="0.86,0.93">bottom right</button>
+          <button type="button" class="link" data-pos="0.5,0.07">top centre</button>
+        </div>
+      </div>
+      <div class="desk-side">
+        <div class="grp">
+          <h3>Layout</h3>
+          <div class="ctl" id="rowScreens"><span>Screens</span>
+            <span class="seg" id="segScreens" role="radiogroup"><button type="button" role="radio" data-v="each">A painting per screen</button><button type="button" role="radio" data-v="same">Same on all</button><button type="button" role="radio" data-v="span">Across all</button></span></div>
+          <div class="ctl"><span>Cut to fit</span>
+            <span class="seg" id="segCrop" role="radiogroup"><button type="button" role="radio" data-v="middle">Middle</button><button type="button" role="radio" data-v="bottom">Bottom</button><button type="button" role="radio" data-v="top">Top</button><button type="button" role="radio" data-v="whole">Whole painting</button></span></div>
+          <div class="ctl" id="rowEdges"><span>Edges</span>
+            <span class="seg" id="segEdges" role="radiogroup"><button type="button" role="radio" data-v="blur">Blurred</button><button type="button" role="radio" data-v="mat">Dark mat</button><button type="button" role="radio" data-v="frame">Gold frame</button></span></div>
+          <p class="note" id="cropNote"></p>
+        </div>
+        <div class="grp">
+          <div class="grp-head"><h3>Label</h3><label class="switch"><input type="checkbox" id="label" aria-label="Label"><span></span></label></div>
+          <div id="labelOpts" class="label-opts">
+            <div class="ctl" id="rowWhere"><span>On</span>
+              <span class="seg" id="segWhere" role="radiogroup"><button type="button" role="radio" data-v="all">All screens</button><button type="button" role="radio" data-v="main">Main</button><button type="button" role="radio" data-v="left">Left</button><button type="button" role="radio" data-v="right">Right</button></span></div>
+            <div class="ctl"><span>Look</span>
+              <span class="seg" id="segLook" role="radiogroup"><button type="button" role="radio" data-v="auto">Auto</button><button type="button" role="radio" data-v="dark">Dark</button><button type="button" role="radio" data-v="light">Light</button><button type="button" role="radio" data-v="plaque">Plaque</button><button type="button" role="radio" data-v="shadow">Shadow</button><button type="button" role="radio" data-v="subtle">Subtle</button></span></div>
+            <p class="note">Auto: dark or light text per painting, so it is always readable.</p>
+            <div class="ctl"><span>Text</span>
+              <select id="labelText" aria-label="Text">
+                <option value="full">Title — Artist, year · Museum</option>
+                <option value="two">Two lines</option>
+                <option value="artist">Title — Artist, year</option>
+                <option value="title">Title (year)</option>
+              </select></div>
+            <div class="ctl"><span>Font &amp; size</span>
+              <span class="ctl-pair"><span class="seg" id="segFont" role="radiogroup"><button type="button" role="radio" data-v="sans">Sans</button><button type="button" role="radio" data-v="serif"><span class="serif">Serif</span></button></span>
+                <span class="seg" id="segSize" role="radiogroup"><button type="button" role="radio" data-v="s">S</button><button type="button" role="radio" data-v="m">M</button><button type="button" role="radio" data-v="l">L</button></span></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
     <section class="box">
       <h3>Collection</h3>
       <div class="row">
@@ -122,6 +170,8 @@
     </div>
   </footer>
   <script src="shell.js"></script>
+  <script src="desk.js"></script>
+  <script src="screens.js"></script>
   <script>
     "use strict";
     const size = (b) => b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB`

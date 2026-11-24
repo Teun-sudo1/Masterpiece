@@ -1,7 +1,9 @@
 "use strict";
 // "Your desktop" on the Curator tab: a live preview of your screens (what is cut off, the whole
 // painting with its edges, the label), the layout and label settings beside it, and what comes next.
-// Needs shell.js and curator.js (cur, saveSettings, refreshLabel, thumbUrl).
+// Needs shell.js and a page script with cur, saveSettings, refreshLabel, thumbUrl and rotation:
+// screens.js on Settings (the preview with layout and label), curator.js on the Curator tab
+// (only "Coming next" and the thumbs come from here).
 
 const LABEL_SIZE_DIV = { s: 72, m: 55, l: 40 };       // same as wallpaper.LABEL_SIZES
 const CROP_AT = { middle: [0.5, 0.5], bottom: [0.5, 1], top: [0.5, 0] };   // same as wallpaper.CROPS
@@ -74,6 +76,7 @@ function deskTargets() {
 }
 
 function renderDesk() {
+  if (!$("deskStage")) return;
   const stage = $("deskStage");
   if (!stage) return;
   const { mons, x0, y0, W, H, targets } = deskTargets();
@@ -270,6 +273,18 @@ function renderCaptions(targets, mons, k, ox, width) {
       p.maker ? ` — ${[p.maker, p.year].filter(Boolean).join(", ")}` : "", ...tags);
   }));
 }
+// More / less like this: the Curator learns from it. Down also takes the painting away.
+function thumbs(p) {
+  const btn = (value, name, label) => el("button", {
+    type: "button", class: `thumb-btn${p.thumb === value ? " on" : ""}`, title: label, "aria-label": `${label}: ${p.title}`,
+    "aria-pressed": String(p.thumb === value),
+    onclick: () => rotation("thumb", { name: p.name, value: p.thumb === value ? 0 : value }),
+  }, icon(name));
+  return el("span", { class: "thumbs" },
+    btn(1, "up", "More like this"),
+    btn(-1, "down", "Less like this: it goes, and the Curator looks for fewer like it"));
+}
+
 const m0 = (t, mons) => t.mons.length === 1 && t.mons[0].primary && mons.length > 1;
 
 // ------------------------------------------------------------------ dragging (painting and label)
@@ -379,14 +394,25 @@ function setupDesk() {
     });
   }
   setupDeskDrag();
-  setupUpcoming();
   syncDeskControls();
 }
 
 // ------------------------------------------------------------------ coming next
+const SEASON_TEXT = { winter: "winter scenes", spring: "spring paintings", summer: "summer paintings", autumn: "autumn paintings" };
+function moodText(m) {
+  const parts = [];
+  if (m.daypart === "evening") parts.push("darker paintings for the evening");
+  else if (m.daypart === "day") parts.push("brighter paintings by day");
+  if (m.season) parts.push(`more ${SEASON_TEXT[m.season]}`);
+  const t = parts.join(" · ");
+  return t ? t[0].toUpperCase() + t.slice(1) : "";
+}
+
 function renderUpcoming() {
+  if (!$("nextRow")) return;
   const list = cur.rot.upcoming || [];
   $("deskNext").hidden = !list.length;
+  $("mood").textContent = moodText(cur.rot.mood || {});
   const mons = cur.rot.screens || [];
   const best = (p) => {                                  // the screen whose shape suits it best
     if (!mons.length || !p.w) return null;

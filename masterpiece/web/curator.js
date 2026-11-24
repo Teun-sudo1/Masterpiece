@@ -1,5 +1,6 @@
 "use strict";
-// The Curator tab: what's on your desktop (desk.js), how it changes, and your taste.
+// The Curator tab: what's on your screens (with ♥ and thumbs), what comes next, how it changes,
+// and what the Curator looks for. The preview with layout and label is on Settings (desk.js).
 
 const cur = { s: {}, rot: {}, options: {}, sources: [], items: [], group: "subjects" };
 const PRESET_INTERVALS = [10, 30, 60, 180, 1440];
@@ -14,10 +15,54 @@ async function saveSettings(updates) {
 }
 
 // ------------------------------------------------------------------ now on your screens
+// One tile per screen (the same painting on several screens: one tile), in screen order
+function renderOnScreens() {
+  const mons = cur.rot.screens || [];
+  const byKey = new Map(mons.map((m) => [m.id, m]));
+  const seen = new Map();
+  for (const c of cur.rot.onScreens || []) {
+    const m = byKey.get(c.key);
+    if (seen.has(c.name)) { seen.get(c.name).mons.push(m); continue; }
+    seen.set(c.name, { c, mons: [m] });
+  }
+  const tiles = [...seen.values()].sort((a, b) => ((a.mons[0] || {}).x || 0) - ((b.mons[0] || {}).x || 0));
+  if (!tiles.length) {
+    $("nowRow").replaceChildren(el("p", { class: "muted" },
+      cur.rot.count ? "Nothing from Masterpiece on your screens yet. Press › in the bar below." : "Your collection is still empty."));
+    return;
+  }
+  const crop = cur.s.crop || "middle";
+  $("nowRow").replaceChildren(...tiles.map(({ c, mons: ms }) => {
+    const m = ms[0] || { width: 16, height: 9 };
+    const span = cur.s.screens === "span" && mons.length > 1;
+    const w = span ? mons.reduce((t, x) => t + x.width, 0) : m.width;
+    const at = c.focus || CROP_AT[crop] || [0.5, 0.5];
+    const where = span || ms.length > 1 ? "All screens" : screenName(m, mons);
+    const btn = (cls, name, label, on, fn) => el("button", { type: "button", class: `thumb-btn${on ? " on" : ""}`,
+      title: label, "aria-label": `${label}: ${c.title}`, "aria-pressed": String(!!on), onclick: fn }, icon(name));
+    return el("figure", { class: "now-tile", style: `flex:${w} 1 0` },
+      el("a", { class: "now-pic", href: `painting.html?name=${encodeURIComponent(c.name)}`, style: `aspect-ratio:${w}/${m.height}` },
+        el("img", { src: thumbUrl(c.name, true), alt: c.title,
+          style: crop === "whole" ? "object-fit:contain" : `object-position:${at[0] * 100}% ${at[1] * 100}%` })),
+      el("figcaption", {},
+        el("div", { class: "t" }, el("b", {}, c.title),
+          el("span", {}, [where, [c.maker, c.year].filter(Boolean).join(", ")].filter(Boolean).join(" · "))),
+        el("span", { class: "thumbs" },
+          btn("fav", "heart", c.favourite ? "Favourite (click to undo)" : "Favourite: comes up more often", c.favourite,
+            () => api("/api/collection", { action: "favourite", name: c.name, on: !c.favourite })
+              .then(() => api("/api/rotation")).then(setRotation).catch((e) => toast(e.message))),
+          btn("up", "up", "More like this", c.thumb === 1,
+            () => rotation("thumb", { name: c.name, value: c.thumb === 1 ? 0 : 1 })),
+          btn("down", "down", "Less like this: it goes, and the Curator looks for fewer like it", c.thumb === -1,
+            () => rotation("thumb", { name: c.name, value: -1 })))));
+  }));
+}
+
 function renderNow() {
-  renderDesk();
+  renderOnScreens();
   renderUpcoming();
   renderAskBtn();
+  renderLearned();
 }
 
 // "Ask the Curator now" shows that it is busy, also when you come back to this tab
@@ -64,15 +109,27 @@ function setIntervalUi(minutes) {
 }
 
 function renderSource() {
-  for (const b of $("sourcePick").children) {
-    const on = b.dataset.mode === cur.s.mode;
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-checked", String(on));
-  }
   $("tasteBox").classList.toggle("dim", cur.s.mode !== "curator");
   $("tasteNote").textContent = cur.s.mode === "curator"
-    ? "The Curator looks for paintings like these. Slide to “never” to leave something out."
-    : "Used when the Curator chooses. Switch “What to show” to “Curator chooses” to use it.";
+    ? "Tap what you'd like more of. Your thumbs up and down do the rest."
+    : "Used when the Curator chooses: switch to “Curator chooses” in the bar at the bottom.";
+}
+
+// Subjects as chips: on = "More" (or "A lot"). Fine-tune has the sliders for every level.
+function renderChips() {
+  $("subjectChips").replaceChildren(...groupItems("subjects").map(([key, label]) => {
+    const lv = level("subjects", key), on = lv >= 3;
+    return el("button", {
+      type: "button", class: `chip${on ? " on" : ""}${lv <= 1 ? " less" : ""}`, "aria-pressed": String(on),
+      title: lv === 0 ? "Never: click to look for it again" : on ? "Click: back to normal" : "Click: more of this",
+      onclick: () => {
+        cur.s.curatorTaste = cur.s.curatorTaste || {};
+        cur.s.curatorTaste.subjects = { ...(cur.s.curatorTaste.subjects || {}), [key]: on ? 2 : 3 };
+        saveTaste();
+        renderChips();
+        if (cur.group === "subjects") renderSliders();
+      } }, lv === 0 ? `${label} · never` : label);
+  }));
 }
 
 async function refreshLabel() {
@@ -117,6 +174,7 @@ function renderSliders() {
       val.textContent = LEVELS[v];
       row.className = `slider-row lv${v}`;
       saveTaste();
+      if (group === "subjects") renderChips();
     });
     return row;
   }));
@@ -142,6 +200,19 @@ function renderArtists() {
     } }, m)) : [el("span", { class: "muted" }, "Add or favourite a few paintings and your artists appear here.")]));
 }
 
+function renderLearned() {
+  const L = cur.rot.learned || {};
+  $("learnedBox").hidden = !(L.up || L.down);
+  if (!(L.up || L.down)) return;
+  $("learnedCount").textContent = [L.up ? `${L.up} × more like this` : "", L.down ? `${L.down} × less` : ""]
+    .filter(Boolean).join(" · ");
+  $("learned").replaceChildren(
+    ...(L.more || []).map((x) => el("span", { class: "chip-more" }, `more ${x}`)),
+    ...(L.less || []).map((x) => el("span", { class: "chip-less" }, `less ${x}`)),
+    el("button", { type: "button", class: "link", title: "The Curator forgets your thumbs (paintings you took away stay away)",
+      onclick: () => rotation("forgetThumbs") }, "Forget"));
+}
+
 function renderRecent() {
   const latest = cur.rot.curatorLatest || [];
   $("recentBox").hidden = !latest.length;
@@ -165,7 +236,7 @@ async function init() {
   await loadItems();
 
   setIntervalUi(s.interval || 60);
-  setupDesk();
+  setupUpcoming();
   $("timeOfDay").checked = !!s.timeOfDay;
   $("seasons").checked = !!s.seasons;
   $("lockScreen").checked = !!s.lockScreen;
@@ -175,6 +246,7 @@ async function init() {
   renderNow();
   renderSource();
   renderSliders();
+  renderChips();
   renderArtists();
   renderRecent();
 
@@ -188,14 +260,6 @@ async function init() {
     renderRecent();
   });
 
-  $("sourcePick").addEventListener("click", async (e) => {
-    const b = e.target.closest("button[data-mode]");
-    if (!b || b.dataset.mode === cur.s.mode) return;
-    cur.rot = await api("/api/rotation", { action: "source", mode: b.dataset.mode });
-    cur.s.mode = cur.rot.mode;
-    renderSource();
-    renderNow();
-  });
   const onInterval = () => {
     $("customWrap").hidden = $("interval").value !== "custom";
     rotation("interval", { interval: intervalMinutes() });
@@ -206,8 +270,11 @@ async function init() {
   });
   $("customN").addEventListener("change", onInterval);
   $("customUnit").addEventListener("change", onInterval);
-  $("timeOfDay").addEventListener("change", (e) => saveSettings({ timeOfDay: e.target.checked }));
-  $("seasons").addEventListener("change", (e) => saveSettings({ seasons: e.target.checked }));
+  // "Coming next" is planned again for the new mood
+  const moodSwitch = (key) => (e) => saveSettings({ [key]: e.target.checked })
+    .then(() => api("/api/rotation")).then(setRotation).catch(() => {});
+  $("timeOfDay").addEventListener("change", moodSwitch("timeOfDay"));
+  $("seasons").addEventListener("change", moodSwitch("seasons"));
   $("lockScreen").addEventListener("change", async (e) => {
     e.target.disabled = true;
     try {
@@ -234,6 +301,7 @@ async function init() {
     asking = true;
     renderAskBtn();
     await rotation("curator", {}, (r) => ((r.curator || []).length ? ""
+      : r.offline || r.curatorWaiting ? "You seem to be offline. Your paintings keep changing; the Curator looks for new ones once you're back online."
       : "The Curator found nothing new right now. Try again later or loosen your taste a little."));
     asking = false;
     renderAskBtn();

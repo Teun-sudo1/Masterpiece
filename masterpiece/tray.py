@@ -14,7 +14,7 @@ import webbrowser
 import pystray
 from pystray import Menu, MenuItem
 
-from . import UPDATE_REPO, backup, desktop, schedule, server, settings, wallpaper
+from . import UPDATE_REPO, backup, cache, curator, desktop, schedule, server, settings, wallpaper
 
 
 class Tray:
@@ -75,6 +75,18 @@ class Tray:
         self.icon.notify(f"“{c['title'][:80]}” comes up about three times as often." if on
                          else f"“{c['title'][:80]}” is no longer a favourite.", "Favourite" if on else "Masterpiece")
 
+    def thumb(self, name: str, value: int):
+        from . import curator
+        if value > 0 and curator.thumb_of(settings.load(), name) > 0:
+            value = 0                                   # clicked again: forget it
+        r = curator.thumb(name, value)
+        if value > 0:
+            self.icon.notify("The Curator looks for more paintings like this one.", "More like this")
+        elif value < 0:
+            now = " · ".join((r.get("wallpapers") or {}).values())
+            self.icon.notify((f"Now: {now}" if now else "The Curator looks for fewer paintings like it.")[:200],
+                             "Less like this")
+
     def about(self, name: str):
         self.open_app(f"painting.html?name={urllib.parse.quote(name)}")
 
@@ -123,7 +135,10 @@ class Tray:
         if added is None:
             return
         if not added:
-            if force:
+            if force and cache.kv().get("curator:waiting", 1e12):
+                self.icon.notify("You seem to be offline. Your paintings keep changing; the Curator looks "
+                                 "for new ones once you're back online.", "Curator")
+            elif force:
                 self.icon.notify("The Curator found nothing new right now. Try again later.", "Curator")
             return
         shown = wallpaper.show_from_settings(prefer=[a["name"] for a in added])
@@ -167,6 +182,9 @@ class Tray:
                 MenuItem("About this painting", self._safe(lambda n=c["name"]: self.about(n)), default=True),
                 MenuItem("Favourite", self._safe(lambda c=c: self.toggle_favourite(c)),
                          checked=lambda item, i=c["id"]: i in favs),
+                MenuItem("More like this", self._safe(lambda n=c["name"]: self.thumb(n, 1)),
+                         checked=lambda item, n=c["name"]: curator.thumb_of(settings.load(), n) > 0),
+                MenuItem("Less like this (and take it away)", self._safe(lambda n=c["name"]: self.thumb(n, -1))),
                 MenuItem("Skip (remove from my collection)", self._safe(lambda n=c["name"]: self.skip(n))),
             ]
             if c.get("link"):

@@ -621,6 +621,40 @@ def fav_names(favourites) -> set[str]:
     return {re.sub(r"[^\w-]+", "-", i) + ".jpg" for i in favourites or ()}
 
 
+LIKED_WEIGHT = 1.5           # "more like this" also brings that painting back a bit more often
+
+
+def weigher(files: list[Path], favourites=(), time_of_day: bool = False, seasons: bool = False,
+            liked=()):
+    """How likely each painting is to come up now: favourites and thumbs up more often; with
+    "Match time of day" bright ones by day and dark ones in the evening; with "Follow the
+    seasons" paintings of this season more often (and of the opposite season less)."""
+    src = {p: _source_for(p)[0] for p in files}
+    favs, liked = fav_names(favourites), fav_names(liked)
+    tod = time_of_day_weights([src[p] for p in files]) if time_of_day else {}
+    season = {}
+    if seasons:
+        now = season_now()
+        for p in files:
+            meta = cache.kv().get(_meta_key(p.name), 1e12) or {}
+            season[p] = season_weight(f"{meta.get('title', '')} {meta.get('text', '')}", now)
+
+    def weight(p: Path) -> float:
+        return ((FAVOURITE_WEIGHT if p.name in favs else 1.0) * (LIKED_WEIGHT if p.name in liked else 1.0)
+                * tod.get(src.get(p), 1.0) * season.get(p, 1.0))
+    return weight
+
+
+def liked_ids(s: dict) -> list[str]:
+    return [k for k, t in (s.get("thumbs") or {}).items() if (t or {}).get("v", 0) > 0]
+
+
+def mood(s: dict) -> dict:
+    """What the rotation leans towards right now (for "Coming next")."""
+    return {"daypart": daypart() if s.get("timeOfDay") else "",
+            "season": season_now() if s.get("seasons") else ""}
+
+
 def show_next(folder: Path, screens: str = "each", label: bool = True,
               prefer: list[str] | None = None,
               pos: tuple[float, float] = DEFAULT_LABEL_POS,
@@ -628,7 +662,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               favourites=None, time_of_day: bool = False,
               keep: dict | None = None, lock_screen: bool = False, seasons: bool = False,
               record: bool = True, crop: str = "middle", edges: str = "blur",
-              focus: dict | None = None) -> dict:
+              focus: dict | None = None, liked=()) -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -642,18 +676,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
     avoid = {p for p in files if p.name in recent}
     queue = list(prefer or [])                    # in order: what "Coming next" shows
     prefer = queue
-    favs = fav_names(favourites)
-    tod = time_of_day_weights([sources[p][0] for p in files]) if time_of_day else {}
-    season = {}
-    if seasons:
-        now = season_now()
-        for p in files:
-            meta = cache.kv().get(_meta_key(p.name), 1e12) or {}
-            season[p] = season_weight(f"{meta.get('title', '')} {meta.get('text', '')}", now)
-
-    def weight(p: Path) -> float:
-        return ((FAVOURITE_WEIGHT if p.name in favs else 1.0) * tod.get(sources[p][0], 1.0)
-                * season.get(p, 1.0))
+    weight = weigher(files, favourites, time_of_day, seasons, liked)
 
     lay = monitors.layout()
     mons = lay["monitors"] or [{"id": None, "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True}]
@@ -795,11 +818,20 @@ def upcoming(folder: Path, s: dict | None = None, n: int = UPCOMING) -> list[str
     files = own_files(folder)
     names = {p.name for p in files}
     queue = [x for x in cache.kv().get("rotation:prefer", 1e12) or [] if x in names]
+    # What Masterpiece planned itself (not what you added or dragged) is planned again once the
+    # evening starts or the season turns, so "Coming next" suits the moment it comes.
+    planned = cache.kv().get("rotation:planned", 1e12) or {}
+    want = mood(s)
+    auto = [x for x in planned.get("names") or [] if x in queue]
+    if auto and planned.get("mood") != want:
+        queue = [x for x in queue if x not in auto]
+        auto = []
     if len(queue) < n:
         shapes = screen_shapes(s.get("screens", "each"))
         now = {c["name"] for c in currently_shown()}
         recent = set(cache.kv().get("rotation:recent", 1e12) or [])
-        favs = fav_names(s.get("favourites") or [])
+        weight = weigher(files, s.get("favourites") or [], bool(s.get("timeOfDay")), bool(s.get("seasons")),
+                         liked_ids(s))
 
         def suits(p):
             size = image_size(_source_for(p)[0])
@@ -807,10 +839,12 @@ def upcoming(folder: Path, s: dict | None = None, n: int = UPCOMING) -> list[str
         free = [p for p in files if p.name not in queue and p.name not in now]
         pool = [p for p in free if p.name not in recent and suits(p)] or [p for p in free if suits(p)] or free
         while pool and len(queue) < n:
-            p = random.choices(pool, weights=[FAVOURITE_WEIGHT if p.name in favs else 1.0 for p in pool])[0]
+            p = random.choices(pool, weights=[max(1e-3, weight(p)) for p in pool])[0]
             queue.append(p.name)
+            auto.append(p.name)
             pool.remove(p)
         cache.kv().set("rotation:prefer", queue)
+    cache.kv().set("rotation:planned", {"mood": want, "names": auto})
     return queue[:n]
 
 
@@ -818,6 +852,8 @@ def reorder_upcoming(order: list[str]) -> None:
     queue = cache.kv().get("rotation:prefer", 1e12) or []
     first = [n for n in order if n in queue]
     cache.kv().set("rotation:prefer", first + [n for n in queue if n not in first])
+    planned = cache.kv().get("rotation:planned", 1e12) or {}     # your order: kept as it is
+    cache.kv().set("rotation:planned", {**planned, "names": [n for n in planned.get("names") or [] if n not in first]})
 
 
 def skip_upcoming(name: str) -> None:
@@ -832,7 +868,8 @@ def painting_card(folder: Path, name: str) -> dict:
     meta = cache.kv().get(_meta_key(name), 1e12) or {}
     p = folder / name
     size = image_size(_source_for(p)[0]) if p.exists() else None
-    return {"name": name, "title": meta.get("title") or name, "maker": meta.get("maker", ""),
+    return {"name": name, "id": str(meta.get("id") or Path(name).stem),
+            "title": meta.get("title") or name, "maker": meta.get("maker", ""),
             "year": meta.get("year", ""), "museum": meta.get("museum", ""),
             "w": size[0] if size else 0, "h": size[1] if size else 0}
 
@@ -859,6 +896,8 @@ def show_from_settings(s: dict | None = None, **kw) -> dict:
     from . import settings as _settings
     s = s or _settings.load()
     folder = resolve_folder(s.get("folder"))
+    if "keep" not in kw and "force" not in kw:
+        upcoming(folder, s)                       # planned again if the evening or a season began
     queue = [n for n in cache.kv().get("rotation:prefer", 1e12) or [] if (folder / n).exists()]
     if queue and "prefer" not in kw and "keep" not in kw:
         kw["prefer"] = queue
@@ -915,7 +954,7 @@ def _show_from_settings(s: dict | None = None, **kw) -> dict:
                      favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")),
                      lock_screen=bool(s.get("lockScreen")), seasons=bool(s.get("seasons")),
                      crop=s.get("crop") or "middle", edges=s.get("edges") or "blur",
-                     focus=s.get("crops") or {}, **kw)
+                     focus=s.get("crops") or {}, liked=liked_ids(s), **kw)
 
 
 def relabel_folder(folder: Path, label: bool, pos=DEFAULT_LABEL_POS, style: dict | None = None) -> int:
