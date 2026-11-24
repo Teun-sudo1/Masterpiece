@@ -19,6 +19,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +29,7 @@ from . import UPDATE_REPO, __version__, cache
 
 API = "https://api.github.com/repos/{repo}/releases/latest"
 CHECK_TTL = 12 * 3600
+BUSY_WAIT = 15 * 60          # GitHub said "too many requests" without saying until when
 HEADERS = {"User-Agent": f"Masterpiece/{__version__} (update check)",
            "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 SETUP_NAME = re.compile(r"^Masterpiece-Setup-[\d.]+\.exe$", re.I)
@@ -55,6 +57,24 @@ def _get(url: str, timeout: float = 20) -> bytes:
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read()
+
+
+def _busy_until(e) -> float:
+    """When GitHub lets us ask again: Retry-After or X-RateLimit-Reset, else in 15 minutes."""
+    h = getattr(e, "headers", None) or {}
+    now = time.time()
+    try:
+        if h.get("Retry-After"):
+            return now + max(60, min(3600, float(h["Retry-After"])))
+        if h.get("X-RateLimit-Reset"):
+            return max(now + 60, min(now + 3600, float(h["X-RateLimit-Reset"]) + 5))
+    except (TypeError, ValueError):
+        pass
+    return now + BUSY_WAIT
+
+
+def _busy_text(until: float) -> str:
+    return f"GitHub is busy right now; Masterpiece checks again at {time.strftime('%H:%M', time.localtime(until))}."
 
 
 def _parse(release: dict) -> dict | None:
@@ -91,17 +111,30 @@ def check(force: bool = False) -> dict:
         return out
     rel = None if force else cache.kv().get("update:latest", CHECK_TTL)
     if rel is None:
-        try:
-            rel = _parse(json.loads(_get(API.format(repo=UPDATE_REPO)))) or {}
-        except urllib.error.HTTPError as e:
-            out["error"] = ("No updates have been published yet." if e.code == 404
-                            else "GitHub is busy right now; Masterpiece tries again later." if e.code in (403, 429)
-                            else f"Couldn't check for updates (HTTP {e.code}).")
-            return out
-        except Exception:                       # offline, timeout, …
-            out["error"] = "Couldn't check for updates: no connection to GitHub."
-            return out
-        cache.kv().set("update:latest", rel)
+        # GitHub allows ~60 checks an hour per internet connection. After "too many", wait until
+        # GitHub says it's fine again instead of asking on every page (also "Check now").
+        until = float(cache.kv().get("update:busyUntil", 1e12) or 0)
+        if until > time.time():
+            out["error"] = _busy_text(until)
+            rel = cache.kv().get("update:latest", 1e12)       # the last answer, however old
+            if not rel:
+                return out
+        else:
+            try:
+                rel = _parse(json.loads(_get(API.format(repo=UPDATE_REPO)))) or {}
+            except urllib.error.HTTPError as e:
+                if e.code in (403, 429):
+                    until = _busy_until(e)
+                    cache.kv().set("update:busyUntil", until)
+                    out["error"] = _busy_text(until)
+                else:
+                    out["error"] = ("No updates have been published yet." if e.code == 404
+                                    else f"Couldn't check for updates (HTTP {e.code}).")
+                return out
+            except Exception:                   # offline, timeout, …
+                out["error"] = "Couldn't check for updates: no connection to GitHub."
+                return out
+            cache.kv().set("update:latest", rel)
     if rel:
         out["latest"] = rel["version"]
         out["release"] = rel

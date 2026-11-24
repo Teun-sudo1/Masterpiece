@@ -1373,3 +1373,31 @@ def test_coming_next_follows_the_curators_sliders(tmp_path, monkeypatch):
         cache.kv().set("rotation:prefer", [])
         seen |= set(wallpaper.upcoming(folder, s))
     assert seen & flowers
+
+
+def test_update_check_waits_after_github_says_busy(monkeypatch):
+    import time as _t
+    import urllib.error
+    from masterpiece import cache, update
+    calls = []
+
+    def busy(url, timeout=20):
+        calls.append(url)
+        raise urllib.error.HTTPError(url, 403, "rate limited", {"X-RateLimit-Reset": str(int(_t.time()) + 600)}, None)
+
+    monkeypatch.setattr(update, "UPDATE_REPO", "someone/something")
+    monkeypatch.setattr(update, "enabled", lambda: True)
+    monkeypatch.setattr(update, "_get", busy)
+    r = update.check(force=True)
+    assert "checks again at" in r["error"] and len(calls) == 1
+    for _ in range(5):                                   # every page / "Check now": no new requests
+        assert "checks again at" in update.check(force=True)["error"]
+    assert len(calls) == 1
+    cache.kv().set("update:busyUntil", _t.time() - 1)    # the wait is over: asks again
+    update.check()
+    assert len(calls) == 2
+
+
+def test_tests_never_contact_github():
+    from masterpiece import update
+    assert "no connection" in update.check(force=True)["error"].lower() or not update.enabled()
