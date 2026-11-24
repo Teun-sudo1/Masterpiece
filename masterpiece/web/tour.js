@@ -51,6 +51,8 @@ const TOUR_STEPS = [
     news: "Open a painting for a few lines from Wikipedia about it and its artist. Save the picture, save it as a postcard with its label, or copy the postcard to paste into a chat. Also in the tray menu." },
   { sel: '[data-tab="curator"]', since: "0.7.0", title: "About what's on your screens",
     news: "On the Curator tab, click a painting to read about it right beside the preview. And “Coming next” now follows the Curator's sliders: set a subject to “never” and those paintings stop coming up." },
+  { sel: '[data-tab="settings"]', since: "0.7.1", title: "Sliders beside the preview",
+    news: "In Settings › Your screens, the slider that chooses the part you see is now beside the preview (or under it), no longer on top of the painting. And Masterpiece opens in its own window again instead of the browser." },
   { sel: "#rotBar", since: "0.6.0", title: "Works offline",
     news: "Without internet, Masterpiece keeps changing between the paintings you already have and says “Offline” down here. The Curator looks for new ones once you're back online." },
 ];

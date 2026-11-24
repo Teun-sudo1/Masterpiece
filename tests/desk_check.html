@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Desk check</title>
+  <style>body { margin: 0; } iframe { border: 0; display: block; }</style>
+</head>
+<body>
+  <!-- Used by tests/test_desk.py: opens Settings › Your screens (in an iframe) at a few window
+       sizes and measures where the crop sliders are: outside every screen and every faded part,
+       inside the preview, beside / under the screen they belong to. -->
+  <iframe id="f"></iframe>
+  <pre id="result"></pre>
+  <script>
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const SIZES = [[1500, 950], [1100, 800]];
+    const rect = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
+    const overlaps = (a, b) => a.l < b.r - 0.5 && a.r > b.l + 0.5 && a.t < b.b - 0.5 && a.b > b.t + 0.5;
+    const round = (r) => [r.l, r.t, r.r, r.b].map(Math.round).join(",");
+
+    async function measure(w, h) {
+      const f = document.getElementById("f");
+      f.style.width = `${w}px`;
+      f.style.height = `${h}px`;
+      await new Promise((r) => { f.onload = r; f.src = `/settings.html?check=${Math.random()}`; });
+      const doc = f.contentWindow.document;
+      for (let i = 0; i < 100 && !doc.querySelector("#deskStage .desk-screen"); i++) await sleep(100);
+      await sleep(1200);                                    // layout settles (fonts, scrollbar)
+      const stage = rect(doc.getElementById("deskStage"));
+      const main = rect(doc.getElementById("deskStage").parentElement);
+      const screens = [...doc.querySelectorAll("#deskStage .desk-screen")].map((s) => ({ name: s.dataset.name, ...rect(s) }));
+      const pictures = [...doc.querySelectorAll("#deskStage .desk-ghost")].map(rect);
+      const sliders = [...doc.querySelectorAll("#deskStage .desk-slider")].map((s) => ({
+        vertical: s.classList.contains("v"), label: s.getAttribute("aria-label"), ...rect(s) }));
+      return { size: `${w}×${h}`, stage, main, screens, pictures, sliders };
+    }
+
+    (async () => {
+      const out = [];
+      for (const [w, h] of SIZES) out.push(await measure(w, h));
+      document.getElementById("result").textContent = JSON.stringify(out);
+    })();
+  </script>
+</body>
+</html>

@@ -75,6 +75,23 @@ function deskTargets() {
   return { mons, x0, y0, W, H, targets };
 }
 
+// Where each painting's slider goes, outside the preview: top … bottom beside its screen, on
+// the outer side (one painting: on the left; two screens: left and right), left … right under
+// it. A screen in the middle of three keeps its slider inside.
+const SLIDER_ROOM = 24;                            // px kept free for a slider
+function sliderPlan(targets, W) {
+  const plan = [];
+  for (const t of targets) {
+    if (!t.p) continue;
+    const g = placePainting(t.p, t.box.w, t.box.h);
+    if (g.whole || g.cut < 0.01) continue;
+    const vertical = g.dh - t.box.h >= g.dw - t.box.w;
+    const side = !vertical ? "below" : t.box.x <= 0 ? "left" : t.box.x + t.box.w >= W - 1 ? "right" : "inside";
+    plan.push({ t, g, vertical, side });
+  }
+  return plan;
+}
+
 function renderDesk() {
   if (!$("deskStage")) return;
   const stage = $("deskStage");
@@ -83,6 +100,9 @@ function renderDesk() {
   const st = style(), withLabel = labelledScreens(mons, st.where);
   // room around the screens for the faded, cut-off parts
   let padL = 0, padR = 0, padT = 0, padB = 0, k;
+  const plan = sliderPlan(targets, W);
+  const room = (side) => (plan.some((x) => x.side === side) ? SLIDER_ROOM : 0);
+  const extraL = room("left"), extraR = room("right"), extraB = room("below");
   if (desk.frozen) {
     ({ padL, padR, padT, padB, k } = desk.frozen);
   } else {
@@ -95,12 +115,14 @@ function renderDesk() {
     const box = getComputedStyle(stage.parentElement);
     const availW = stage.parentElement.clientWidth - parseFloat(box.paddingLeft) - parseFloat(box.paddingRight);
     const maxH = Math.max(220, Math.min(560, innerHeight - 330));
-    k = Math.min(availW / (W + padL + padR), maxH / (H + padT + padB));
+    k = Math.min((availW - extraL - extraR) / (W + padL + padR), (maxH - extraB) / (H + padT + padB));
   }
   desk.layout = { padL, padR, padT, padB, k };
-  stage.style.width = `${(W + padL + padR) * k}px`;
-  stage.style.height = `${(H + padT + padB) * k}px`;
-  const ox = padL * k, oy = padT * k;
+  stage.style.width = `${(W + padL + padR) * k + extraL + extraR}px`;
+  stage.style.height = `${(H + padT + padB) * k + extraB}px`;
+  const ox = extraL + padL * k, oy = padT * k;
+  const edge = { left: extraL / 2, right: extraL + (W + padL + padR) * k + extraR / 2,
+                 below: (H + padT + padB) * k + extraB / 2 };
   const kids = [];
 
   targets.forEach((t, ti) => {
@@ -158,32 +180,39 @@ function renderDesk() {
     stage.append(el("div", { class: "desk-layer", id: "deskLayer" }), el("div", { class: "desk-sliders", id: "deskSliders" }));
   }
   $("deskLayer").replaceChildren(...kids);
-  if (!desk.sliding) $("deskSliders").replaceChildren(...cropSliders(targets, k, ox, oy));
+  if (!desk.sliding) $("deskSliders").replaceChildren(...cropSliders(plan, k, ox, oy, edge));
   for (const c of stage.querySelectorAll(".chip-label")) placeChip(c);
   autoTones();
-  renderCaptions(targets, mons, k, ox, (W + padL + padR) * k);
+  renderCaptions(targets, mons, k, ox, (W + padL + padR) * k + extraL + extraR);
 }
 
-// A slider beside each painting that is cut off: it moves the part you see (top … bottom, or
-// left … right). The thumb sits where the visible part is.
-function cropSliders(targets, k, ox, oy) {
+// A slider beside (or under) each painting that is cut off: it moves the part you see
+// (top … bottom, or left … right). The thumb sits where the visible part is.
+function cropSliders(plan, k, ox, oy, edge) {
   const out = [];
-  for (const t of targets) {
-    if (!t.p) continue;
-    const g = placePainting(t.p, t.box.w, t.box.h);
-    if (g.whole || g.cut < 0.01) continue;
-    const vertical = g.dh - t.box.h >= g.dw - t.box.w;
+  for (const { t, g, vertical, side } of plan) {
     const bx = ox + t.box.x * k, by = oy + t.box.y * k, bw = t.box.w * k, bh = t.box.h * k;
+    const half = 6;                                 // half the slider's thickness
+    const style = side === "below" ? `left:${bx}px;top:${edge.below - half}px;width:${bw}px`
+      : side === "left" ? `left:${edge.left - half}px;top:${by}px;height:${bh}px`
+      : side === "right" ? `left:${edge.right - half}px;top:${by}px;height:${bh}px`
+      : `left:${bx + bw - 24}px;top:${by + 12}px;height:${bh - 24}px`;
     const name = t.p.name;
     const input = el("input", {
       type: "range", min: "0", max: "1000", step: "1", class: `desk-slider ${vertical ? "v" : "h"}`,
       value: String(Math.round((vertical ? g.cy : g.cx) * 1000)),
       "aria-label": vertical ? `Which part of “${t.p.title}”: top to bottom` : `Which part of “${t.p.title}”: left to right`,
       title: vertical ? "Slide to choose which part you see: top … bottom" : "Slide to choose which part you see: left … right",
-      style: vertical ? `left:${bx + bw - 24}px;top:${by + 12}px;height:${bh - 24}px`
-                      : `left:${bx + 12}px;top:${by + bh - 24}px;width:${bw - 24}px`,
+      style,
     });
     const start = () => { desk.sliding = name; desk.frozen = desk.frozen || { ...desk.layout }; };
+    // which screen it belongs to: that screen lights up while you point at its slider
+    const mark = (on) => { for (const w of document.querySelectorAll(".desk-screen"))
+      if (w.dataset.name === name) w.classList.toggle("slider-hover", on); };
+    input.addEventListener("pointerenter", () => mark(true));
+    input.addEventListener("pointerleave", () => mark(false));
+    input.addEventListener("focus", () => mark(true));
+    input.addEventListener("blur", () => mark(false));
     input.addEventListener("pointerdown", start);
     input.addEventListener("keydown", start);
     input.addEventListener("input", () => {

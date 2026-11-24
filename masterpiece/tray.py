@@ -95,8 +95,7 @@ class Tray:
             self.icon.notify("Paste it into a chat or an e-mail (Ctrl+V).", "Postcard copied")
         else:
             dest = share.save(folder, name)
-            self.icon.notify(f"{dest.name}
-in Pictures › Saved from Masterpiece"[:200], "Saved")
+            self.icon.notify(f"{dest.name} is in Pictures › Saved from Masterpiece."[:200], "Saved")
 
     def about(self, name: str):
         self.open_app(f"painting.html?name={urllib.parse.quote(name)}")

@@ -83,6 +83,7 @@ a { color: var(--accent); }
 .desk-slider:hover, .desk-slider:focus-visible, .desk-slider:active { opacity: 1; }
 .desk-slider.v { writing-mode: vertical-lr; width: 12px; }
 .desk-slider.h { height: 12px; }
+.desk-screen.slider-hover { box-shadow: 0 0 0 2px var(--accent), 0 10px 26px rgba(0,0,0,.45); }
 .desk-img { position: absolute; max-width: none; pointer-events: none; }
 .desk-img.framed { box-shadow: 0 0 0 3px #3c2c14, 0 0 0 7px #96743a, 0 4px 14px rgba(0,0,0,.6); }
 .desk-blur { position: absolute; left: -10%; top: -10%; width: 120%; height: 120%; object-fit: cover;
