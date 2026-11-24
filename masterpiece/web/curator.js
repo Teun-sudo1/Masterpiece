@@ -27,21 +27,29 @@ function renderOnScreens() {
   }
   const tiles = [...seen.values()].sort((a, b) => ((a.mons[0] || {}).x || 0) - ((b.mons[0] || {}).x || 0));
   if (!tiles.length) {
+    $("nowAbout").hidden = true;
     $("nowRow").replaceChildren(el("p", { class: "muted" },
       cur.rot.count ? "Nothing from Masterpiece on your screens yet. Press › in the bar below." : "Your collection is still empty."));
     return;
   }
   const crop = cur.s.crop || "middle";
+  $("nowAbout").hidden = false;
+  if (!cur.sel || !tiles.some((t) => t.c.name === cur.sel) && !cur.selPinned) cur.sel = tiles[0].c.name;
   $("nowRow").replaceChildren(...tiles.map(({ c, mons: ms }) => {
-    const m = ms[0] || { width: 16, height: 9 };
-    const span = cur.s.screens === "span" && mons.length > 1;
-    const w = span ? mons.reduce((t, x) => t + x.width, 0) : m.width;
+    const span = (cur.s.screens === "span" || c.key === "span") && mons.length > 1;
+    // across all screens: the whole area they cover together; else that screen (or the main one)
+    const box = span ? { width: Math.max(...mons.map((x) => x.x + x.width)) - Math.min(...mons.map((x) => x.x)),
+                         height: Math.max(...mons.map((x) => x.y + x.height)) - Math.min(...mons.map((x) => x.y)) } : null;
+    const m = box || ms.find(Boolean) || mons.find((x) => x.primary) || mons[0] || { width: 16, height: 9 };
+    const w = m.width;
     const at = c.focus || CROP_AT[crop] || [0.5, 0.5];
     const where = span || ms.length > 1 ? "All screens" : screenName(m, mons);
     const btn = (cls, name, label, on, fn) => el("button", { type: "button", class: `thumb-btn${on ? " on" : ""}`,
       title: label, "aria-label": `${label}: ${c.title}`, "aria-pressed": String(!!on), onclick: fn }, icon(name));
-    return el("figure", { class: "now-tile", style: `flex:${w} 1 0` },
-      el("a", { class: "now-pic", href: `painting.html?name=${encodeURIComponent(c.name)}`, style: `aspect-ratio:${w}/${m.height}` },
+    return el("figure", { class: `now-tile${c.name === cur.sel ? " sel" : ""}`, style: `flex:${w} 1 0` },
+      el("div", { class: "now-pic", role: "button", tabindex: "0", title: "About this painting (shown on the right)",
+        style: `aspect-ratio:${w}/${m.height}`, onclick: () => showAbout(c.name),
+        onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showAbout(c.name); } } },
         el("img", { src: thumbUrl(c.name, true), alt: c.title,
           style: crop === "whole" ? "object-fit:contain" : `object-position:${at[0] * 100}% ${at[1] * 100}%` })),
       el("figcaption", {},
@@ -58,6 +66,32 @@ function renderOnScreens() {
   }));
 }
 
+// About the chosen painting, beside the preview (instead of a separate page)
+function showAbout(name, pinned = false) {
+  cur.sel = name;
+  cur.selPinned = pinned;                    // from Coming next / Recently chosen: not on screen
+  for (const t of document.querySelectorAll("#nowRow .now-tile")) t.classList.remove("sel");
+  renderOnScreens();
+  loadAbout(true);
+}
+
+function loadAbout(force = false) {
+  const box = $("nowAboutBox");
+  if (!box || !cur.sel || (!force && box.dataset.name === cur.sel)) return;
+  renderAbout(box, cur.sel, { compact: true, onChange: () => { box.dataset.name = ""; loadItems().then(loadAbout); } });
+}
+
+// Links to a painting's page in Coming next and Recently chosen: show it beside the preview
+function aboutLinks(container) {
+  container.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="painting.html"]');
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    showAbout(new URL(a.href).searchParams.get("name"), true);
+    $("nowRow").closest("section").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 // Screens: the same choice as in Settings › Your screens
 function renderScreensPick() {
   $("rowScreensCur").hidden = (cur.rot.screens || cur.options.screens || []).length < 2;
@@ -71,6 +105,7 @@ function renderScreensPick() {
 function renderNow() {
   renderScreensPick();
   renderOnScreens();
+  loadAbout();
   renderUpcoming();
   renderAskBtn();
   renderLearned();
@@ -167,7 +202,9 @@ function level(group, key) {
 let tasteTimer;
 function saveTaste() {
   clearTimeout(tasteTimer);
-  tasteTimer = setTimeout(() => saveSettings({ curatorTaste: cur.s.curatorTaste }), 400);
+  // saved, then "Coming next" is planned again with the new sliders
+  tasteTimer = setTimeout(() => saveSettings({ curatorTaste: cur.s.curatorTaste })
+    .then(() => api("/api/rotation")).then(setRotation).catch(() => {}), 400);
 }
 
 function renderSliders() {
@@ -236,7 +273,7 @@ function renderRecent() {
 async function loadItems() {
   const d = await api("/api/collection");
   cur.items = d.items;
-  setCollectionCount(d.items.length);
+  setCollectionCount(d.mine);
 }
 
 async function init() {
@@ -256,6 +293,8 @@ async function init() {
     refreshLabel();                              // shows it on your screens right away
   });
   setupUpcoming();
+  aboutLinks($("nextRow"));
+  aboutLinks($("recent"));
   $("timeOfDay").checked = !!s.timeOfDay;
   $("seasons").checked = !!s.seasons;
   $("lockScreen").checked = !!s.lockScreen;

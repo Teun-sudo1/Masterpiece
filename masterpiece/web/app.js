@@ -386,7 +386,7 @@ function thumbImg(a) {
 
 function card(a) {
   const sel = state.selected.has(a.id);
-  return el("article", { class: `card${sel ? " selected" : ""}`, "data-id": a.id },
+  return el("article", { class: `card${sel ? " selected" : ""}${state.saved.has(a.id) ? " is-saved" : ""}`, "data-id": a.id },
     el("button", {
       type: "button", class: "thumb", title: "Preview",
       onclick: () => openLightbox(currentList().findIndex((x) => x.id === a.id)),
@@ -448,6 +448,7 @@ async function refreshSaved() {
     const has = state.saved.has(c.dataset.id), badge = c.querySelector(".saved");
     if (has && !badge) c.querySelector(".thumb").after(savedBadge());
     if (!has && badge) badge.remove();
+    c.classList.toggle("is-saved", has);           // already yours: no + to add it again
   }
 }
 
@@ -506,7 +507,9 @@ function renderLightbox() {
     .filter(Boolean).join(" · ");
   $("lbLink").href = a.link || "#";
   $("lbLink").hidden = !a.link;
-  $("lbSelect").textContent = state.selected.has(a.id) ? "✓ Selected" : "Add to selection";
+  const saved = state.saved.has(a.id);
+  $("lbSelect").textContent = saved ? "✓ In My collection" : state.selected.has(a.id) ? "✓ Selected" : "Add to selection";
+  $("lbSelect").disabled = saved;
   $("lbSelect").onclick = () => toggle(a);
   $("lbPrev").disabled = state.lbIndex <= 0;
   $("lbNext").disabled = state.lbIndex >= list.length - 1;

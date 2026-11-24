@@ -45,6 +45,8 @@ HOST_LIMITS = {   # host: (max simultaneous, min seconds between requests)
     "data.getty.edu": (2, 0.1),
     "media.getty.edu": (2, 0.1),
     "upload.wikimedia.org": (1, 1.0),              # rare files are rendered on request: one a second
+    "en.wikipedia.org": (1, 0.2),                  # "About this painting": a few small requests
+    "www.wikidata.org": (1, 0.2),
 }
 _host_slots: dict[str, "_Slot"] = {}
 _host_lock = threading.Lock()

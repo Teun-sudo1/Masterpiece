@@ -427,10 +427,40 @@ def own_files(folder: Path) -> list[Path]:
                   key=lambda p: p.stat().st_mtime, reverse=True)
 
 
-def saved_ids(folder: Path) -> list[str]:
-    """Artwork IDs of the paintings currently in the collection folder."""
+# The Curator's collection: paintings the Curator chose live in the same folder (so Windows and
+# the rotation can use them), but they are not part of My collection until you keep one.
+def curator_picks() -> dict:
+    """{file name: {"reason", "date"}} for paintings in the Curator's collection."""
+    return cache.kv().get("curator:picks", 1e12) or {}
+
+
+def keep_pick(names) -> bool:
+    """Move paintings from the Curator's collection into My collection."""
+    names, picks = set(names), curator_picks()
+    if not names & set(picks):
+        return False
+    cache.kv().set("curator:picks", {k: v for k, v in picks.items() if k not in names})
+    return True
+
+
+def my_files(folder: Path) -> list[Path]:
+    """Only the paintings you added yourself (or kept from the Curator)."""
+    picks = curator_picks()
+    return [p for p in own_files(folder) if p.name not in picks]
+
+
+def rotating(folder: Path, s: dict | None) -> list[Path]:
+    """What the rotation chooses from: "Curator chooses" = both collections, "My collection" =
+    only yours (the Curator's when you have none yet, so your desktop doesn't stand still)."""
+    if (s or {}).get("mode") == "curator":
+        return own_files(folder)
+    return my_files(folder) or own_files(folder)
+
+
+def saved_ids(folder: Path, mine: bool = False) -> list[str]:
+    """Artwork IDs of the paintings currently in the collection folder (mine: only My collection)."""
     ids = []
-    for p in own_files(folder):
+    for p in (my_files(folder) if mine else own_files(folder)):
         meta = cache.kv().get(_meta_key(p.name), 1e12) or {}
         ids.append(meta.get("id") or p.stem)     # filename == id for every current source
     return ids
@@ -441,7 +471,12 @@ def cleanup(folder: Path, max_files: int, keep_ids=()) -> list[Path]:
     (keep_ids) are never deleted and don't count towards the maximum."""
     removed = []
     keep = fav_names(keep_ids)
-    for p in [p for p in own_files(folder) if p.name not in keep][max(0, max_files):]:
+    files = [p for p in own_files(folder) if p.name not in keep]      # newest first
+    picks = curator_picks()
+    over = len(files) - max(0, max_files)
+    # the Curator's oldest picks go first; yours only when the Curator's are all gone
+    oldest = [p for p in reversed(files) if p.name in picks] + [p for p in reversed(files) if p.name not in picks]
+    for p in oldest[:max(0, over)]:
         try:
             p.unlink()
             removed.append(p)
@@ -625,7 +660,7 @@ LIKED_WEIGHT = 1.5           # "more like this" also brings that painting back a
 
 
 def weigher(files: list[Path], favourites=(), time_of_day: bool = False, seasons: bool = False,
-            liked=()):
+            liked=(), taste=None):
     """How likely each painting is to come up now: favourites and thumbs up more often; with
     "Match time of day" bright ones by day and dark ones in the evening; with "Follow the
     seasons" paintings of this season more often (and of the opposite season less)."""
@@ -639,10 +674,24 @@ def weigher(files: list[Path], favourites=(), time_of_day: bool = False, seasons
             meta = cache.kv().get(_meta_key(p.name), 1e12) or {}
             season[p] = season_weight(f"{meta.get('title', '')} {meta.get('text', '')}", now)
 
+    fit = {}
+    if taste is not None:                  # "Curator chooses": also what the Curator's sliders say
+        for p in files:
+            meta = cache.kv().get(_meta_key(p.name), 1e12) or {}
+            fit[p] = 1.0 if p.name in favs else taste({**meta, "source": meta.get("source") or p.name.split("-", 1)[0]})
+
     def weight(p: Path) -> float:
         return ((FAVOURITE_WEIGHT if p.name in favs else 1.0) * (LIKED_WEIGHT if p.name in liked else 1.0)
-                * tod.get(src.get(p), 1.0) * season.get(p, 1.0))
+                * tod.get(src.get(p), 1.0) * season.get(p, 1.0) * fit.get(p, 1.0))
     return weight
+
+
+def taste_for(s: dict):
+    """The Curator's sliders as a weight, only in "Curator chooses"."""
+    if (s or {}).get("mode") != "curator":
+        return None
+    from . import curator
+    return curator.rotation_weight(s)
 
 
 def liked_ids(s: dict) -> list[str]:
@@ -651,8 +700,11 @@ def liked_ids(s: dict) -> list[str]:
 
 def mood(s: dict) -> dict:
     """What the rotation leans towards right now (for "Coming next")."""
+    from . import curator
     return {"daypart": daypart() if s.get("timeOfDay") else "",
-            "season": season_now() if s.get("seasons") else ""}
+            "season": season_now() if s.get("seasons") else "",
+            "mode": "curator" if s.get("mode") == "curator" else "mine",
+            "taste": curator.taste_key(s) if s.get("mode") == "curator" else ""}
 
 
 def show_next(folder: Path, screens: str = "each", label: bool = True,
@@ -662,7 +714,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
               favourites=None, time_of_day: bool = False,
               keep: dict | None = None, lock_screen: bool = False, seasons: bool = False,
               record: bool = True, crop: str = "middle", edges: str = "blur",
-              focus: dict | None = None, liked=()) -> dict:
+              focus: dict | None = None, liked=(), only_mine: bool = False, taste=None) -> dict:
     """Put the next painting(s) on the desktop. screens: 'each' | 'same' | 'span'.
     favourites: artwork IDs that come up more often. time_of_day: bright by day, dark at night.
     keep: {screen key: file name} that stay where they are (used by "skip").
@@ -670,13 +722,15 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
     files = own_files(folder)
     if not files:
         return {}
+    pool = (my_files(folder) or files) if only_mine else files      # "My collection": only yours
     sources = {p: _source_for(p) for p in files}
     sizes = {p: image_size(sources[p][0]) for p in files}
     recent = set(cache.kv().get("rotation:recent", 1e12) or [])
     avoid = {p for p in files if p.name in recent}
     queue = list(prefer or [])                    # in order: what "Coming next" shows
     prefer = queue
-    weight = weigher(files, favourites, time_of_day, seasons, liked)
+    weight = weigher(files, favourites, time_of_day, seasons, liked, taste)
+    pool = [p for p in pool if weight(p) > 0] or pool          # "never" on a slider: not now
 
     lay = monitors.layout()
     mons = lay["monitors"] or [{"id": None, "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True}]
@@ -728,7 +782,7 @@ def show_next(folder: Path, screens: str = "each", label: bool = True,
         if same and chosen:
             p = next(iter(chosen.values()))[0]
         else:
-            p = _pick(files, sizes, w, h, avoid, prefer, weight)
+            p = _pick(pool, sizes, w, h, avoid, prefer, weight)
         avoid.add(p)
         chosen[key] = (p, w, h, region)
     chosen = {t[0]: chosen[t[0]] for t in targets}   # keep the screens' order
@@ -815,7 +869,7 @@ def upcoming(folder: Path, s: dict | None = None, n: int = UPCOMING) -> list[str
     of your screens, so what "Coming next" shows really is what comes next."""
     from . import settings as _settings
     s = s or _settings.load()
-    files = own_files(folder)
+    files = rotating(folder, s)
     names = {p.name for p in files}
     queue = [x for x in cache.kv().get("rotation:prefer", 1e12) or [] if x in names]
     # What Masterpiece planned itself (not what you added or dragged) is planned again once the
@@ -831,12 +885,13 @@ def upcoming(folder: Path, s: dict | None = None, n: int = UPCOMING) -> list[str
         now = {c["name"] for c in currently_shown()}
         recent = set(cache.kv().get("rotation:recent", 1e12) or [])
         weight = weigher(files, s.get("favourites") or [], bool(s.get("timeOfDay")), bool(s.get("seasons")),
-                         liked_ids(s))
+                         liked_ids(s), taste_for(s))
 
         def suits(p):
             size = image_size(_source_for(p)[0])
             return bool(size) and any(ratio_close(size[0] / size[1], w / h) for w, h in shapes)
         free = [p for p in files if p.name not in queue and p.name not in now]
+        free = [p for p in free if weight(p) > 0] or free
         pool = [p for p in free if p.name not in recent and suits(p)] or [p for p in free if suits(p)] or free
         while pool and len(queue) < n:
             p = random.choices(pool, weights=[max(1e-3, weight(p)) for p in pool])[0]
@@ -941,6 +996,7 @@ def add_to_collection(artworks: list, s: dict | None = None) -> dict:
         for a, path, err in ex.map(one, artworks):
             (ok if path else failed).append({"id": a.id, "title": a.title, "name": path.name if path else None,
                                              "error": err})
+    keep_pick(d["name"] for d in ok)              # added it yourself: it's yours now
     queue_first([d["name"] for d in ok])
     removed = cleanup(folder, int(s.get("maxFiles") or 50), keep_ids=s.get("favourites") or ())
     return {"added": ok, "failed": failed, "removed": [p.name for p in removed]}
@@ -954,7 +1010,8 @@ def _show_from_settings(s: dict | None = None, **kw) -> dict:
                      favourites=s.get("favourites") or [], time_of_day=bool(s.get("timeOfDay")),
                      lock_screen=bool(s.get("lockScreen")), seasons=bool(s.get("seasons")),
                      crop=s.get("crop") or "middle", edges=s.get("edges") or "blur",
-                     focus=s.get("crops") or {}, liked=liked_ids(s), **kw)
+                     focus=s.get("crops") or {}, liked=liked_ids(s), only_mine=s.get("mode") != "curator",
+                     taste=taste_for(s), **kw)
 
 
 def relabel_folder(folder: Path, label: bool, pos=DEFAULT_LABEL_POS, style: dict | None = None) -> int:
@@ -1073,6 +1130,7 @@ def set_favourite(artwork_id: str, on: bool) -> list[str]:
     favs = [f for f in _settings.load().get("favourites") or [] if f != artwork_id]
     if on:
         favs.append(artwork_id)
+        keep_pick(fav_names([artwork_id]))        # a favourite from the Curator: yours now
     return _settings.save({"favourites": favs})["favourites"]
 
 

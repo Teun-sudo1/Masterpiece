@@ -37,7 +37,6 @@
         <div class="chips" id="showChips" role="group" aria-label="Show">
           <button type="button" data-show="all" aria-pressed="true">All</button>
           <button type="button" data-show="fav">♥ Favourites</button>
-          <button type="button" data-show="curator">Curator's picks</button>
           <button type="button" data-show="screen">On screen</button>
         </div>
       </details>
@@ -69,7 +68,16 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span>Filters</span></button>
 
     <main class="content">
-      <p class="sub" id="sub"></p>
+      <div class="coll-head">
+        <span class="seg which" id="which" role="radiogroup" aria-label="Which collection">
+          <button type="button" role="radio" data-which="mine" aria-checked="true">My collection <span id="nMine"></span></button>
+          <button type="button" role="radio" data-which="curator" aria-checked="false"
+            title="What the Curator chose for you. Keep one and it moves to My collection.">From the Curator <span id="nCur"></span></button>
+        </span>
+        <p class="sub" id="sub"></p>
+      </div>
+      <p class="which-note" id="whichNote" hidden>Chosen by the Curator. These come and go: the oldest make room for new ones.
+        Keep one (or ♥ it) and it moves to My collection.</p>
       <div id="grid" class="grid"></div>
       <p class="empty" id="empty" hidden></p>
 
@@ -85,7 +93,7 @@
   <footer class="rotbar" id="rotBar">
     <div class="rot-left">
       <span class="seg rot-mode" id="rotMode" role="radiogroup" aria-label="What to show">
-        <button type="button" role="radio" data-mode="curator" title="New paintings every day that suit your taste, plus your collection">Curator chooses</button>
+        <button type="button" role="radio" data-mode="curator" title="New paintings every day that suit your taste, together with your own collection">Curator chooses</button>
         <button type="button" role="radio" data-mode="rotate" title="Only the paintings you added yourself">My collection</button>
       </span>
       <div class="now-status" id="rotStatus"></div>
@@ -101,7 +109,7 @@
   <script src="shell.js"></script>
   <script>
     "use strict";
-    const coll = { items: [], banned: [], show: "all", subjects: {}, periods: {} };
+    const coll = { items: [], banned: [], show: "all", which: "mine", subjects: {}, periods: {} };
     const infoUrl = (name) => `painting.html?name=${encodeURIComponent(name)}`;
     const fold = (s) => (s || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
     const yearOf = (s) => { const m = String(s || "").match(/\d{4}/); return m ? Number(m[0]) : null; };
@@ -126,7 +134,7 @@
     function card(it) {
       const badges = [];
       if (it.onScreen) badges.push(el("span", { class: "badge-top on" }, "On screen"));
-      if (it.curator) badges.push(el("span", { class: "badge-top", title: it.curator }, "Curator's pick"));
+      if (it.fromCurator && it.curator) badges.push(el("span", { class: "badge-top", title: it.curator }, "Curator's pick"));
       return el("article", { class: "card" },
         el("a", { class: "thumb", href: infoUrl(it.name), title: "About this painting" },
           el("img", { src: `/api/thumb?name=${encodeURIComponent(it.name)}`, alt: it.title, loading: "lazy" })),
@@ -137,7 +145,10 @@
           el("div", { class: "maker" }, [it.maker, it.year].filter(Boolean).join(", ")),
           el("div", { class: "meta" }, el("span", { class: "badge" }, it.museum || "—"),
             el("span", {}, it.width ? `${it.width} × ${it.height}` : "")),
+          ...(it.fromCurator && it.curator ? [el("p", { class: "pick-reason" }, it.curator)] : []),
           el("div", { class: "card-actions" },
+            ...(it.fromCurator ? [el("button", { type: "button", class: "small primary", title: "Move it to My collection",
+              onclick: () => act({ action: "keep", name: it.name }).then(() => toast(`“${it.title}” is in My collection now.`)) }, "Keep")] : []),
             el("button", { type: "button", class: "small", title: "Put it on your desktop now",
               onclick: () => act({ action: "show", name: it.name }) }, "Show now"),
             it.onScreen
@@ -158,7 +169,7 @@
         const hay = fold(`${it.title} ${it.maker}`);
         if (q.length && !q.every((w) => hay.includes(w))) return false;
         if (coll.show === "fav" && !it.favourite) return false;
-        if (coll.show === "curator" && !it.curator) return false;
+        if (!!it.fromCurator !== (coll.which === "curator")) return false;
         if (coll.show === "screen" && !it.onScreen) return false;
         if (subj && !subj.some((t) => new RegExp(`\\b${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i").test(fold(it.title)))) return false;
         if (per) { const y = yearOf(it.year); if (y === null || y < per.start || y >= per.end) return false; }
@@ -178,13 +189,23 @@
     function render() {
       const list = filtered();
       $("grid").replaceChildren(...list.map(card));
-      const total = coll.items.length, bytes = coll.items.reduce((s, i) => s + i.bytes, 0);
-      const favs = coll.items.filter((i) => i.favourite).length;
+      const here = coll.items.filter((i) => !!i.fromCurator === (coll.which === "curator"));
+      const total = here.length, bytes = here.reduce((s, i) => s + i.bytes, 0);
+      const favs = here.filter((i) => i.favourite).length;
+      $("nMine").textContent = coll.items.length - coll.items.filter((i) => i.fromCurator).length || "";
+      $("nCur").textContent = coll.items.filter((i) => i.fromCurator).length || "";
+      for (const b of $("which").children) {
+        b.classList.toggle("on", b.dataset.which === coll.which);
+        b.setAttribute("aria-checked", String(b.dataset.which === coll.which));
+      }
+      $("whichNote").hidden = coll.which !== "curator" || !total;
       $("sub").textContent = total ? (list.length === total ? `${total} paintings` : `${list.length} of ${total} paintings`)
         + ` · ${mb(bytes)}${favs ? ` · ${favs} favourite${favs === 1 ? "" : "s"}` : ""}` : "";
       $("empty").hidden = list.length > 0;
       $("empty").textContent = total ? "Nothing matches these filters."
-        : "Your collection is empty. Add paintings from Search art, or let the Curator choose for you.";
+        : coll.which === "curator"
+          ? "Nothing from the Curator yet. Choose “Curator chooses” in the bar below and it finds new paintings for you every day."
+          : "Your collection is empty. Add paintings from Search art, or keep ones the Curator chose for you.";
       const n = [...document.querySelectorAll("#museums input:checked")].length;
       $("museumSummary").textContent = n ? `${n} chosen` : "all";
     }
@@ -192,7 +213,7 @@
     async function load() {
       const d = await api("/api/collection");
       coll.items = d.items;
-      setCollectionCount(d.items.length);
+      setCollectionCount(d.mine);
       const museums = [...new Set(d.items.map((i) => i.museum).filter(Boolean))].sort();
       const checked = new Set([...document.querySelectorAll("#museums input:checked")].map((i) => i.value));
       $("museums").replaceChildren(...museums.map((m) => el("label", { class: "check" },
@@ -225,8 +246,17 @@
         for (const x of $("showChips").children) x.setAttribute("aria-pressed", String(x === b));
         render();
       });
+      $("which").addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-which]");
+        if (!b) return;
+        coll.which = b.dataset.which;
+        try { sessionStorage.setItem("which", coll.which); } catch { /* fine */ }
+        render();
+      });
       const want = new URLSearchParams(location.search).get("show");
-      if (want) $("showChips").querySelector(`[data-show="${want}"]`)?.click();
+      try { coll.which = sessionStorage.getItem("which") || "mine"; } catch { /* fine */ }
+      if (want === "curator") coll.which = "curator";
+      else if (want) $("showChips").querySelector(`[data-show="${want}"]`)?.click();
       await load();
     }
     init().catch((e) => toast(`Couldn't load your collection: ${e.message}`));

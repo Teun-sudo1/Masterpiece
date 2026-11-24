@@ -103,9 +103,11 @@ class Handler(BaseHTTPRequestHandler):
                     favs = set(s.get("favourites") or [])
                     from . import curator
                     reasons = curator.picks()
-                    items = [{**i, "favourite": i["id"] in favs, "curator": (reasons.get(i["name"]) or {}).get("reason", "")}
+                    items = [{**i, "favourite": i["id"] in favs, "curator": (reasons.get(i["name"]) or {}).get("reason", ""),
+                              "fromCurator": i["name"] in reasons}
                              for i in wallpaper.collection(folder)]
                     return self._json({"folder": str(folder), "items": items,
+                                       "mine": sum(1 for i in items if not i["fromCurator"]),
                                        "banned": s.get("banned") or [],
                                        "timeOfDay": bool(s.get("timeOfDay")),
                                        "current": wallpaper.shown_summary(),
@@ -118,7 +120,14 @@ class Handler(BaseHTTPRequestHandler):
                         return self._error(404, "This painting is no longer in your collection")
                     from . import curator
                     info["curator"] = curator.reason_for(info["name"])
+                    info["fromCurator"] = info["name"] in curator.picks()
                     return self._json(info)
+                if url.path == "/api/about":         # Wikipedia about the painting and its artist
+                    from . import wiki
+                    m = cache.kv().get(f"art:{qs.get('name', '')}", 1e12) or {}
+                    if not m.get("id"):
+                        return self._error(404, "This painting is no longer in your collection")
+                    return self._json(wiki.about(str(m["id"]), m.get("title") or "", m.get("maker") or ""))
                 if url.path == "/api/thumb":
                     folder = wallpaper.resolve_folder(settings.load().get("folder"))
                     w = 1200 if qs.get("size") == "large" else 480
@@ -128,7 +137,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(200, p.read_bytes(), "image/jpeg", {"Cache-Control": "no-cache"})
                 if url.path == "/api/saved":
                     folder = wallpaper.resolve_folder(settings.load().get("folder"))
-                    return self._json(wallpaper.saved_ids(folder))
+                    return self._json(wallpaper.saved_ids(folder, mine=True))
                 if url.path == "/api/rotation":
                     return self._json(self._rotation_status())
                 if url.path == "/api/update":
@@ -265,7 +274,7 @@ class Handler(BaseHTTPRequestHandler):
                 "backup": backup.has_backup(), "mode": s.get("mode"), "interval": s.get("interval"),
                 "shown": wallpaper.shown_summary(),
                 "hasPrevious": len(cache.kv().get("rotation:history", 1e12) or []) > 1,
-                "curatorLatest": curator.latest(), "curatorLast": cache.kv().get("curator:last", 1e12) or "",
+                "curatorLatest": curator.latest(folder), "curatorLast": cache.kv().get("curator:last", 1e12) or "",
                 "curatorBusy": bool(cache.kv().get("curator:running", curator.RUN_GUARD)),
                 "offline": bool(net.offline_since()), "curatorWaiting": bool(cache.kv().get("curator:waiting", 1e12)),
                 **self._desktop(s, folder)}
@@ -411,6 +420,33 @@ class Handler(BaseHTTPRequestHandler):
                 banned.append({k: item[k] for k in ("id", "title", "maker", "museum")})
                 selection = [a for a in s.get("selection") or [] if a.get("id") != item["id"]]
                 settings.save({"banned": banned, "selection": selection})
+            return self._json({"ok": True})
+        if action == "keep":                     # from the Curator's collection into My collection
+            if name not in items:
+                return self._error(404, "Not in your collection")
+            wallpaper.keep_pick([name])
+            return self._json({"ok": True})
+        if action in ("save", "copy"):           # save the picture / a postcard, or copy it
+            from . import share
+            if name not in items:
+                return self._error(404, "Not in your collection")
+            kind = body.get("kind") or ("picture" if action == "save" else "postcard")
+            if kind not in share.KINDS:
+                return self._error(400, "Unknown kind")
+            try:
+                if action == "copy":
+                    share.copy(folder, name, kind)
+                    return self._json({"ok": True})
+                dest = share.save(folder, name, kind)
+            except OSError as e:
+                return self._error(500, str(e) or "Couldn't save it")
+            return self._json({"ok": True, "path": str(dest), "file": dest.name, "folder": str(dest.parent)})
+        if action == "reveal":                   # "Show in folder" after saving
+            from . import share
+            try:
+                share.reveal(Path(str(body.get("path") or "")))
+            except OSError:
+                return self._error(404, "That file isn't there any more")
             return self._json({"ok": True})
         if action == "unban":
             banned = [b for b in s.get("banned") or [] if b.get("id") != body.get("id")]

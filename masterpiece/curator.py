@@ -43,8 +43,9 @@ def _today() -> str:
 
 
 def picks() -> dict:
-    """{file name: {"reason", "date"}} for paintings the Curator added."""
-    return cache.kv().get("curator:picks", 1e12) or {}
+    """{file name: {"reason", "date"}} for paintings in the Curator's collection
+    (not yet kept in My collection)."""
+    return wallpaper.curator_picks()
 
 
 def reason_for(name: str) -> str:
@@ -52,10 +53,14 @@ def reason_for(name: str) -> str:
 
 
 def taste(s: dict, folder: Path) -> Counter:
-    """Artists you like: favourites count 3×, other saved paintings 1×."""
+    """Artists you like: favourites count 3×, other paintings in My collection 1×.
+    The Curator's own picks don't count (only once you keep one, or by thumbs)."""
     favs = set(s.get("favourites") or [])
+    mine = picks()
     makers: Counter = Counter()
     for item in wallpaper.collection(folder):
+        if item["name"] in mine and item["id"] not in favs:
+            continue
         m = (item.get("maker") or "").strip()
         if not m or UNKNOWN.search(m) or m.lower() == "artist":
             continue
@@ -241,6 +246,34 @@ def plan(s: dict, makers: Counter, count: int, rng: random.Random) -> list[dict]
     return out
 
 
+def rotation_weight(s: dict):
+    """For "Coming next" in "Curator chooses": how much a painting you already have suits the
+    sliders (and thumbs) now. 0 = a subject, period or museum you set to "never"."""
+    L = learned(s)
+    subj_w = _nudged(weights(s, "subjects", content.SUBJECTS), L["subjects"])
+    period_w = _nudged(weights(s, "periods", content.PERIODS), L["periods"])
+    museum_w = _nudged(weights(s, "museums", SOURCES), L["museums"])
+
+    def weight(meta: dict) -> float:
+        subs = subjects_of(meta.get("title") or "")
+        w = 1.0
+        if subs:
+            ws = [subj_w.get(k, 1.0) for k in subs]
+            w = 0.0 if min(ws) == 0 else max(ws)
+        per = period_of(meta.get("year"))
+        w *= period_w.get(per, 1.0) if per else 1.0
+        w *= museum_w.get(meta.get("source") or "", 1.0)
+        return w
+    return weight
+
+
+def taste_key(s: dict) -> str:
+    """Changes whenever the sliders change (Coming next is then planned again)."""
+    import hashlib
+    import json as _json
+    return hashlib.md5(_json.dumps(s.get("curatorTaste") or {}, sort_keys=True).encode()).hexdigest()[:10]
+
+
 def _targets(s: dict) -> tuple[str, list[tuple[int, int]]]:
     lay = monitors.layout()
     if s.get("screens") == "span" and lay.get("span") and len(lay["monitors"]) > 1:
@@ -379,5 +412,7 @@ def run_if_due(s: dict | None = None, force: bool = False) -> list[dict] | None:
         cache.kv().set("curator:running", None)
 
 
-def latest() -> list[dict]:
-    return cache.kv().get("curator:latest", 1e12) or []
+def latest(folder: Path | None = None) -> list[dict]:
+    """What the Curator chose last time, without paintings that have left your collection since."""
+    folder = folder or wallpaper.resolve_folder(settings.load().get("folder"))
+    return [a for a in cache.kv().get("curator:latest", 1e12) or [] if a.get("name") and (folder / a["name"]).exists()]

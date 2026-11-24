@@ -1113,7 +1113,7 @@ def test_coming_next_follows_the_mood_and_is_planned_again(tmp_path, monkeypatch
     monkeypatch.setattr(wallpaper, "daypart", lambda hour=None: "day")
     day = wallpaper.upcoming(folder, s)
     assert day[0] == evening[1]
-    assert wallpaper.mood(s) == {"daypart": "day", "season": ""}
+    assert wallpaper.mood(s) == {"daypart": "day", "season": "", "mode": "mine", "taste": ""}
     # statistically: over many plans, bright ones win by day
     bright_hits = 0
     for _ in range(30):
@@ -1188,3 +1188,182 @@ def test_search_says_offline_kindly(monkeypatch):
     monkeypatch.setattr(search, "_collect", lambda *a, **k: (_ for _ in ()).throw(net.Offline("x")))
     r = search.search_all(["aic"], query="monet")
     assert "offline" in r["errors"]["aic"]
+
+
+def test_recently_chosen_leaves_out_removed_paintings(tmp_path):
+    from masterpiece import cache, curator
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    (folder / "aic-1.jpg").write_bytes(b"x")
+    cache.kv().set("curator:latest", [{"name": "aic-1.jpg", "title": "Kept"}, {"name": "aic-2.jpg", "title": "Gone"}])
+    assert [a["title"] for a in curator.latest(folder)] == ["Kept"]
+
+
+# ------------------------------------------------------------------ the Curator's own collection
+
+def _files(folder, names):
+    folder.mkdir(exist_ok=True)
+    for i, n in enumerate(names):
+        p = folder / n
+        p.write_bytes(b"x")
+        os.utime(p, (1000 + i, 1000 + i))        # later in the list = newer
+
+
+def test_curator_picks_are_a_separate_collection(tmp_path):
+    from masterpiece import cache
+    folder = tmp_path / "Masterpiece"
+    _files(folder, ["aic-1.jpg", "aic-2.jpg", "aic-3.jpg"])
+    cache.kv().set("curator:picks", {"aic-2.jpg": {"reason": "r"}, "aic-3.jpg": {"reason": "r"}})
+    assert [p.name for p in wallpaper.my_files(folder)] == ["aic-1.jpg"]
+    assert [p.name for p in wallpaper.rotating(folder, {"mode": "rotate"})] == ["aic-1.jpg"]
+    assert len(wallpaper.rotating(folder, {"mode": "curator"})) == 3
+    assert wallpaper.saved_ids(folder, mine=True) == ["aic-1"]
+    assert wallpaper.keep_pick(["aic-2.jpg"])
+    assert sorted(p.name for p in wallpaper.my_files(folder)) == ["aic-1.jpg", "aic-2.jpg"]
+    wallpaper.set_favourite("aic-3", True)                      # a favourite is kept too
+    assert not wallpaper.curator_picks()
+
+
+def test_my_collection_mode_falls_back_when_empty(tmp_path):
+    from masterpiece import cache
+    folder = tmp_path / "Masterpiece"
+    _files(folder, ["aic-1.jpg"])
+    cache.kv().set("curator:picks", {"aic-1.jpg": {"reason": "r"}})
+    assert [p.name for p in wallpaper.rotating(folder, {"mode": "rotate"})] == ["aic-1.jpg"]
+
+
+def test_cleanup_removes_curator_picks_first(tmp_path):
+    from masterpiece import cache
+    folder = tmp_path / "Masterpiece"
+    _files(folder, ["aic-1.jpg", "aic-2.jpg", "aic-3.jpg", "aic-4.jpg"])   # aic-1 oldest
+    cache.kv().set("curator:picks", {"aic-3.jpg": {}, "aic-4.jpg": {}})
+    removed = wallpaper.cleanup(folder, 2)
+    assert sorted(p.name for p in removed) == ["aic-3.jpg", "aic-4.jpg"]
+
+
+def test_taste_ignores_curator_picks(tmp_path):
+    from masterpiece import cache, curator
+    folder = tmp_path / "Masterpiece"
+    _files(folder, ["aic-1.jpg", "aic-2.jpg"])
+    cache.kv().set("art:aic-1.jpg", {"id": "aic-1", "title": "A", "maker": "Claude Monet"})
+    cache.kv().set("art:aic-2.jpg", {"id": "aic-2", "title": "B", "maker": "Jan Steen"})
+    cache.kv().set("curator:picks", {"aic-2.jpg": {"reason": "r"}})
+    assert set(curator.taste({}, folder)) == {"Claude Monet"}
+
+
+# ------------------------------------------------------------------ save / share
+
+def test_share_file_name_and_postcard(tmp_path):
+    PIL = pytest.importorskip("PIL.Image")
+    from masterpiece import share
+    m = {"title": 'Bridge: "Waterloo"?', "maker": "Claude Monet", "year": "1903", "museum": "AIC", "license": "CC0"}
+    assert share.file_name(m, "picture") == "Bridge Waterloo - Claude Monet.jpg"
+    assert share.file_name(m, "postcard") == "Bridge Waterloo - Claude Monet (postcard).jpg"
+    assert share.caption(m) == ['Bridge: "Waterloo"?', "Claude Monet, 1903", "AIC · CC0"]
+    src = tmp_path / "aic-1.jpg"
+    PIL.new("RGB", (1200, 800), (20, 40, 200)).save(src)
+    card = share.postcard(src, m, 1000)
+    assert card.width > 1000 and card.height > 800 * 1000 / 1200 + 100     # margin + caption
+    assert card.getpixel((5, 5)) == share.PAPER
+    assert share.dib(card)[:4] == (40).to_bytes(4, "little")              # BITMAPINFOHEADER
+
+
+def test_share_save_and_reveal_guard(tmp_path, monkeypatch):
+    PIL = pytest.importorskip("PIL.Image")
+    from masterpiece import cache, share
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "me"))
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    PIL.new("RGB", (600, 400), "red").save(folder / "aic-1.jpg")
+    cache.kv().set("art:aic-1.jpg", {"id": "aic-1", "title": "Red", "maker": "Someone"})
+    p = share.save(folder, "aic-1.jpg", "picture")
+    assert p.parent == share.saved_dir() and p.read_bytes() == (folder / "aic-1.jpg").read_bytes()
+    q = share.save(folder, "aic-1.jpg", "postcard")
+    assert q.name == "Red - Someone (postcard).jpg" and q.exists()
+    with pytest.raises(FileNotFoundError):
+        share.reveal(folder / "aic-1.jpg")                                 # only the saved folder
+    with pytest.raises(FileNotFoundError):
+        share.save(folder, "../secret.jpg")
+
+
+# ------------------------------------------------------------------ Wikipedia
+
+def test_wiki_artist_and_painting(monkeypatch):
+    from masterpiece import wiki
+    calls = []
+
+    def fake(url, params=None, timeout=0):
+        calls.append(url)
+        if "list" in (params or {}):
+            return {"query": {"search": [{"title": "The Bedroom (Van Gogh)", "snippet": "painting by Vincent van Gogh"}]}}
+        if url.endswith("The_Bedroom_%28Van_Gogh%29"):
+            return {"type": "standard", "title": "The Bedroom", "description": "painting by Vincent van Gogh",
+                    "extract": "The Bedroom is a painting by Vincent van Gogh.", "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/B"}}}
+        if url.endswith("Vincent_van_Gogh"):
+            return {"type": "standard", "title": "Vincent van Gogh", "description": "Dutch painter (1853–1890)",
+                    "extract": "Vincent Willem van Gogh was a Dutch Post-Impressionist painter.",
+                    "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/V"}}}
+        return {"type": "disambiguation"}
+
+    monkeypatch.setattr(wiki, "get_json", fake)
+    a = wiki.about("aic-1", "The Bedroom", "Vincent van Gogh (Dutch, 1853–1890)")
+    assert a["painting"]["title"] == "The Bedroom" and a["artist"]["title"] == "Vincent van Gogh"
+    assert a["credit"].startswith("Text from Wikipedia")
+    n = len(calls)
+    wiki.about("aic-1", "The Bedroom", "Vincent van Gogh")               # cached: no new requests
+    assert len(calls) == n
+    assert wiki.about("aic-2", "Landscape", "Unknown artist")["artist"] is None
+
+
+def test_wiki_rejects_wrong_articles(monkeypatch):
+    from masterpiece import wiki
+
+    def fake(url, params=None, timeout=0):
+        if "list" in (params or {}):
+            return {"query": {"search": [{"title": "Sunflowers (band)", "snippet": "a rock band"}]}}
+        return {"type": "standard", "title": "John Smith", "description": "English footballer",
+                "extract": "John Smith is a footballer.", "content_urls": {}}
+
+    monkeypatch.setattr(wiki, "get_json", fake)
+    a = wiki.about("aic-9", "Sunflowers", "John Smith")
+    assert a["painting"] is None and a["artist"] is None and a["credit"] == ""
+
+
+def test_wiki_offline_is_not_cached(monkeypatch):
+    from masterpiece import wiki
+    from masterpiece.net import Offline
+
+    def down(*a, **k):
+        raise Offline("no internet")
+    monkeypatch.setattr(wiki, "get_json", down)
+    assert wiki.about("aic-1", "The Bedroom", "Vincent van Gogh").get("offline")
+    from masterpiece import cache
+    assert cache.kv().get("wiki:painting:aic-1", 1e12) is None
+
+
+def test_coming_next_follows_the_curators_sliders(tmp_path, monkeypatch):
+    PIL = pytest.importorskip("PIL.Image")
+    from masterpiece import cache, monitors
+    folder = tmp_path / "Masterpiece"
+    folder.mkdir()
+    titles = ["Flowers in a vase", "The garden", "Tulips and flowers", "A river landscape", "Harbour with boats", "City street"]
+    for n, t in enumerate(titles):
+        PIL.new("RGB", (1600, 900), "grey").save(folder / f"aic-{n}.jpg")
+        cache.kv().set(f"art:aic-{n}.jpg", {"title": t, "maker": "M", "museum": "X", "source": "aic"})
+        cache.kv().set(f"labelled:aic-{n}.jpg", False)
+    lay = {"monitors": [{"id": "A", "x": 0, "y": 0, "width": 1920, "height": 1080, "primary": True}], "span": None}
+    monkeypatch.setattr(monitors, "layout", lambda: lay)
+    s = {"screens": "each", "folder": str(folder), "mode": "curator"}
+    first = wallpaper.mood(s)
+    s["curatorTaste"] = {"subjects": {"flowers": 0}}
+    assert wallpaper.mood(s) != first                      # a slider moved: planned again
+    flowers = {"aic-0.jpg", "aic-1.jpg", "aic-2.jpg"}
+    for _ in range(10):
+        cache.kv().set("rotation:prefer", [])
+        assert not set(wallpaper.upcoming(folder, s)) & flowers
+    s["mode"] = "rotate"                                   # My collection: the sliders don't apply
+    seen = set()
+    for _ in range(20):
+        cache.kv().set("rotation:prefer", [])
+        seen |= set(wallpaper.upcoming(folder, s))
+    assert seen & flowers

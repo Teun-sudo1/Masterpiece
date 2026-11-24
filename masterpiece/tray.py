@@ -87,6 +87,17 @@ class Tray:
             self.icon.notify((f"Now: {now}" if now else "The Curator looks for fewer paintings like it.")[:200],
                              "Less like this")
 
+    def keep(self, name: str, action: str):
+        from . import share
+        folder = wallpaper.resolve_folder(settings.load().get("folder"))
+        if action == "copy":
+            share.copy(folder, name)
+            self.icon.notify("Paste it into a chat or an e-mail (Ctrl+V).", "Postcard copied")
+        else:
+            dest = share.save(folder, name)
+            self.icon.notify(f"{dest.name}
+in Pictures › Saved from Masterpiece"[:200], "Saved")
+
     def about(self, name: str):
         self.open_app(f"painting.html?name={urllib.parse.quote(name)}")
 
@@ -185,6 +196,8 @@ class Tray:
                 MenuItem("More like this", self._safe(lambda n=c["name"]: self.thumb(n, 1)),
                          checked=lambda item, n=c["name"]: curator.thumb_of(settings.load(), n) > 0),
                 MenuItem("Less like this (and take it away)", self._safe(lambda n=c["name"]: self.thumb(n, -1))),
+                MenuItem("Save to Pictures", self._safe(lambda n=c["name"]: self.keep(n, "save"))),
+                MenuItem("Copy as postcard", self._safe(lambda n=c["name"]: self.keep(n, "copy"))),
                 MenuItem("Skip (remove from my collection)", self._safe(lambda n=c["name"]: self.skip(n))),
             ]
             if c.get("link"):

@@ -26,7 +26,10 @@
         <div><h3>On your screens now</h3>
           <p class="hint">♥ for paintings you love, thumbs up or down to teach the Curator. Layout and label: <a href="settings.html#screens">Settings › Your screens</a>.</p></div>
       </div>
-      <div class="now-row" id="nowRow"></div>
+      <div class="now-wrap">
+        <div class="now-row" id="nowRow"></div>
+        <aside class="now-about" id="nowAbout" aria-live="polite"><div class="about compact" id="nowAboutBox"></div></aside>
+      </div>
       <div class="desk-next" id="deskNext" hidden>
           <div class="desk-next-head"><b>Coming next</b><span class="mood" id="mood"></span><span>Drag to change the order · × skips it</span></div>
           <div class="next-row" id="nextRow"></div>
@@ -58,7 +61,7 @@
           </span>
         </div>
         <div class="row">
-          <div class="what"><b>New from the Curator</b><span>Found in the museums, added to your collection.</span></div>
+          <div class="what"><b>New from the Curator</b><span>Found in the museums, kept apart in My collection › From the Curator.</span></div>
           <select id="curatorDaily" aria-label="New from the Curator"><option value="1">1 a day</option><option value="2">2 a day</option>
             <option value="3">3 a day</option><option value="5">5 a day</option></select>
         </div>
@@ -100,7 +103,7 @@
         <div class="sliders" id="sliders"></div>
 
         <div class="taste-extra">
-          <div class="what"><b>Artists you like</b><span>From your collection and favourites. Click to leave one out.</span></div>
+          <div class="what"><b>Artists you like</b><span>From My collection, favourites and thumbs. Click to leave one out.</span></div>
           <div class="chips artists" id="artists"></div>
         </div>
         <div class="slider-row surprise-row">
@@ -123,7 +126,7 @@
   <footer class="rotbar" id="rotBar">
     <div class="rot-left">
       <span class="seg rot-mode" id="rotMode" role="radiogroup" aria-label="What to show">
-        <button type="button" role="radio" data-mode="curator" title="New paintings every day that suit your taste, plus your collection">Curator chooses</button>
+        <button type="button" role="radio" data-mode="curator" title="New paintings every day that suit your taste, together with your own collection">Curator chooses</button>
         <button type="button" role="radio" data-mode="rotate" title="Only the paintings you added yourself">My collection</button>
       </span>
       <div class="now-status" id="rotStatus"></div>
@@ -138,6 +141,7 @@
   </footer>
   <script src="shell.js"></script>
   <script src="desk.js"></script>
+  <script src="about.js"></script>
   <script src="curator.js"></script>
 </body>
 </html>
