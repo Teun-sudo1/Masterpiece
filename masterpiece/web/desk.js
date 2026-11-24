@@ -387,7 +387,7 @@ function syncDeskControls() {
   $("labelOpts").classList.toggle("dim", !cur.s.label);
   $("cropNote").textContent = cropMode() === "whole"
     ? "Nothing is cut off; the empty edges are filled. Good for portraits and square paintings."
-    : "The faded part is cut off. Use the slider beside a painting to choose the part yourself: it keeps your choice.";
+    : "The faded part is cut off. Use the slider beside a painting to choose the part yourself: it's saved for that painting, also for later (and on its own page).";
 }
 
 function changed(updates, now = false) {               // save, then show it on the desktop too

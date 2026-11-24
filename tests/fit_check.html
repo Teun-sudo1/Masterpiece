@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fit check</title>
+  <style>body { margin: 0; } iframe { border: 0; display: block; }</style>
+</head>
+<body>
+  <!-- Used by tests/test_desk.py: opens a painting's page (in an iframe), measures "On your
+       screens" (screens, faded parts, sliders), then moves each slider and reports what got saved. -->
+  <iframe id="f"></iframe>
+  <pre id="result"></pre>
+  <script>
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const rect = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    const name = new URLSearchParams(location.search).get("name");
+
+    (async () => {
+      const f = document.getElementById("f");
+      f.style.width = "1300px";
+      f.style.height = "1400px";
+      await new Promise((r) => { f.onload = r; f.src = `/painting.html?name=${encodeURIComponent(name)}`; });
+      const doc = f.contentWindow.document;
+      for (let i = 0; i < 100 && !doc.querySelector("#fit .fit-note"); i++) await sleep(100);
+      await sleep(600);
+      const measure = () => [...doc.querySelectorAll("#fit .fit-stage")].map((st) => ({
+        stage: rect(st), screen: rect(st.querySelector(".fit-screen")), ghost: rect(st.querySelector(".fit-ghost")),
+        ghostShown: st.querySelector(".fit-ghost").style.display !== "none",
+        sliders: [...st.querySelectorAll(".fit-slider")].map((s) => ({ vertical: s.classList.contains("v"), ...rect(s) })),
+        cut: st.querySelector(".fit-cut").textContent }));
+      const before = measure();
+      const note = doc.querySelector("#fit .fit-note").textContent;
+      const sl = doc.querySelector("#fit .fit-slider");
+      let after = null, saved = null, noteAfter = "";
+      if (sl) {
+        sl.value = "1000";
+        sl.dispatchEvent(new Event("input", { bubbles: true }));
+        sl.dispatchEvent(new Event("change", { bubbles: true }));
+        await sleep(800);
+        after = measure();
+        noteAfter = doc.querySelector("#fit .fit-note").textContent;
+        saved = ((await (await fetch("/api/settings")).json()).crops || {})[name] || null;
+      }
+      const text = doc.getElementById("fit").textContent;
+      document.getElementById("result").textContent = JSON.stringify({ before, after, note, noteAfter, saved, text });
+    })();
+  </script>
+</body>
+</html>

@@ -356,7 +356,8 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 crops.pop(name, None)
             s = settings.save({"crops": crops})
-            return self._json({**wallpaper.refresh_labels(s), **self._rotation_status()})
+            on_screen = any(c.get("name") == name for c in wallpaper.currently_shown())
+            return self._json({**(wallpaper.refresh_labels(s) if on_screen else {}), **self._rotation_status()})
         if action == "thumb":                    # more (1) / less (-1) like this, 0 = forget
             from . import curator
             r = curator.thumb(name, int(body.get("value") or 0))

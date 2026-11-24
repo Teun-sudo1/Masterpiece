@@ -677,6 +677,21 @@ dialog .prev { left: 8px; } dialog .next { right: 8px; }
 .about .wiki a { color: var(--accent); font-size: 13px; }
 .about .wiki .credit { margin-top: 10px; }
 
+/* Painting page: on your screens (the part you see) */
+.about .fit h4 { margin: 20px 0 10px; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.fit-grid { display: flex; flex-wrap: wrap; gap: 18px 22px; align-items: flex-start; }
+.fit-item { margin: 0; }
+.fit-stage { position: relative; }
+.fit-ghost { position: absolute; opacity: .24; filter: grayscale(.3); pointer-events: none; max-width: none; }
+.fit-screen { position: absolute; overflow: hidden; border-radius: 3px; background: #0a0a0a;
+  box-shadow: 0 0 0 2px #3a3a3a, 0 8px 20px rgba(0,0,0,.4); }
+.fit-img { position: absolute; max-width: none; pointer-events: none; }
+.fit-dim { position: absolute; left: 6px; top: 4px; font-size: 10.5px; color: #fff; text-shadow: 0 1px 2px #000; }
+.fit-cut { position: absolute; right: 4px; top: 4px; font-size: 10.5px; color: var(--muted); background: rgba(0,0,0,.55);
+  padding: 1px 6px; border-radius: 99px; pointer-events: none; }
+.fit-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 10px 0 0; max-width: 560px; }
+.fit-note b { color: var(--accent); font-weight: 600; }
+
 /* Curator tab: the painting's info beside the preview */
 .now-wrap { display: flex; gap: 24px; align-items: stretch; }
 .now-wrap .now-row { flex: 0 1 auto; min-width: 0; }
