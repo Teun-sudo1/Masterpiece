@@ -58,7 +58,18 @@ function renderOnScreens() {
   }));
 }
 
+// Screens: the same choice as in Settings › Your screens
+function renderScreensPick() {
+  $("rowScreensCur").hidden = (cur.rot.screens || cur.options.screens || []).length < 2;
+  for (const b of $("segScreensCur").querySelectorAll("button")) {
+    const on = b.dataset.v === (cur.s.screens || "each");
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-checked", String(on));
+  }
+}
+
 function renderNow() {
+  renderScreensPick();
   renderOnScreens();
   renderUpcoming();
   renderAskBtn();
@@ -236,6 +247,14 @@ async function init() {
   await loadItems();
 
   setIntervalUi(s.interval || 60);
+  $("segScreensCur").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-v]");
+    if (!b || b.dataset.v === (cur.s.screens || "each")) return;
+    cur.s.screens = b.dataset.v;
+    renderScreensPick();
+    await saveSettings({ screens: b.dataset.v });
+    refreshLabel();                              // shows it on your screens right away
+  });
   setupUpcoming();
   $("timeOfDay").checked = !!s.timeOfDay;
   $("seasons").checked = !!s.seasons;
